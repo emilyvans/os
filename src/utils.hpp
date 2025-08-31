@@ -17,4 +17,4 @@ void print(const char *fmt);
 
 void print(const char *fmt, uint64_t count);
 
-void print(uint64_t original_number, uint64_t base = 10);
+void print(uint64_t original_number, uint64_t base);
