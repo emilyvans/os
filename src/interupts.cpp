@@ -17,9 +17,6 @@ void set_IDT_entry(Idtr *idtr, uint64_t i, uint64_t entry, uint8_t dpl) {
 	idt->reserved = 0;
 }
 
-__attribute__((interrupt)) void
-interrupt_handler(struct interrupt_frame *frame) {}
-
 void load_idt(Idtrr *idt_reg) {
 	asm volatile("lidt %0" ::"m"(*idt_reg));
 }

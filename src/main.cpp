@@ -254,32 +254,52 @@ void clear_screen(uint32_t color) {
 	cursor = {0, 0};
 }
 
-__attribute__((interrupt)) void pf_handler(struct interrupt_frame *frame,
-                                           uint64_t error_code) {
+void pf_handler(interrupt_frame *frame) {
 	clear_screen(background_color);
 	printf("page fault\ntype: %x\nip: %x\ncs: %x\nflags: %x\nsp: %x\nss: "
 	       "%x\nerror code: %x\n",
-	       0xE, frame->ip, frame->cs, frame->flags, frame->sp, frame->ss,
-	       error_code);
+	       0xE, frame->rip, frame->cs, frame->flags, frame->sp, frame->ss,
+	       frame->error_code);
 	hcf();
 }
-__attribute__((interrupt)) void
-double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
+void double_fault_handler(interrupt_frame *frame) {
+	(void)frame; // to remove warning
 	printf("double fault");
 	hcf();
 }
-__attribute__((interrupt)) void gp_handler(struct interrupt_frame *frame,
-                                           uint64_t error_code) {
+void gp_handler(interrupt_frame *frame) {
+	(void)frame; // to remove warning
 	printf("general protation");
 	hcf();
 }
-__attribute__((interrupt)) void iop_handler(struct interrupt_frame *frame,
-                                            uint64_t error_code) {
+void iop_handler(interrupt_frame *frame) {
+	(void)frame; // to remove warning
 	printf("invalid opcode");
 	hcf();
 }
-__attribute__((interrupt)) void unknown_handler(struct interrupt_frame *frame) {
-	printf("unknow exception");
+void unknown_handler(interrupt_frame *frame) {
+	printf("unknow exception\nnumber: %x", frame->interupt_nr);
+	hcf();
+}
+
+void interrupt_handler(interrupt_frame *frame) {
+	clear_screen(background_color);
+	switch (frame->interupt_nr) {
+	case 0x6:
+		iop_handler(frame);
+		break;
+	case 0x8:
+		double_fault_handler(frame);
+		break;
+	case 0xD:
+		gp_handler(frame);
+		break;
+	case 0xE:
+		pf_handler(frame);
+		break;
+	default:
+		unknown_handler(frame);
+	}
 	hcf();
 }
 
@@ -398,6 +418,96 @@ struct ACPI_descriptor_table {
 	} data;
 };
 
+struct BGRT {
+	ACPI_SDT_header header;
+	uint16_t version_id;
+	uint8_t status;
+	uint8_t image_type;
+	uint64_t image_address;
+	uint32_t image_x_offset;
+	uint32_t image_y_offset;
+} __attribute__((packed));
+
+struct bitmap_DIB {
+	uint32_t size;
+	int32_t width;
+	int32_t height;
+	uint16_t color_planes_count;
+	uint16_t bit_per_pixel;
+	uint32_t compression_method;
+	uint32_t image_size;
+	uint32_t horizontal_resolution;
+	uint32_t vertical_resolution;
+	uint32_t color_count_in_color_palette;
+	uint32_t important_colors_count;
+} __attribute__((packed));
+
+struct bitmap_header {
+	char magic[2];
+	uint32_t file_size;
+	uint16_t reserved1;
+	uint16_t reserved2;
+	uint32_t pixel_byte_offset;
+	bitmap_DIB info_header;
+} __attribute__((packed));
+
+void display_BGRT(BGRT *bgrt) {
+	bitmap_header *bitmap_ptr =
+		(bitmap_header *)(bgrt->image_address + hhdm_request.response->offset);
+	/*printf("x offset: %u\ny offset: %u\ntype: %u\nstatus: %b\naddress: "
+	       "%x\n",
+	       bgrt->image_x_offset, bgrt->image_y_offset, bgrt->image_type,
+	       bgrt->status, (uint64_t)bitmap_ptr);
+
+	printf("%c%c\n", bitmap_ptr->magic[0], bitmap_ptr->magic[1]);
+	printf("DIB size: %u\n", bitmap_ptr->info_header.size);*/
+
+	if (bitmap_ptr->info_header.size != 40) {
+		printf("Only bitmaps with DIB size of 40 is supported!\n");
+		return;
+	}
+
+	/*printf("width: %u\nheight: %u\nbpp: %u\ncompress: %u\ncolors: %u\naddress:
+	   "
+	       "%x\n size: %uBytes\n img addr: %x\n",
+	       bitmap_ptr->info_header.width, bitmap_ptr->info_header.height,
+	       bitmap_ptr->info_header.bit_per_pixel,
+	       bitmap_ptr->info_header.compression_method,
+	       bitmap_ptr->info_header.color_count_in_color_palette,
+	       (uint64_t)bitmap_ptr, bitmap_ptr->file_size,
+	       bitmap_ptr->pixel_byte_offset);*/
+
+	if (bitmap_ptr->info_header.bit_per_pixel != 24) {
+		printf("bitmap support is only for 24bits per pixel for now!\n");
+		return;
+	}
+
+	volatile uint32_t *fb_ptr = (uint32_t *)framebuffer->address;
+
+	uint8_t *pixels =
+		(uint8_t *)(bgrt->image_address + bitmap_ptr->pixel_byte_offset +
+	                hhdm_request.response->offset);
+
+	uint64_t row_size = ((bitmap_ptr->info_header.bit_per_pixel *
+	                          bitmap_ptr->info_header.width +
+	                      31) /
+	                     32) *
+	                    4;
+
+	for (int32_t y = 0; y < bitmap_ptr->info_header.height; y++) {
+		for (int32_t x = 0; x < bitmap_ptr->info_header.width; x++) {
+			uint32_t index = (y + bgrt->image_y_offset) * framebuffer->width +
+			                 (x + bgrt->image_x_offset);
+			uint64_t pixel_index =
+				row_size * (bitmap_ptr->info_header.height - y - 1) + (x * 3);
+			uint8_t r = pixels[pixel_index + 2];
+			uint8_t g = pixels[pixel_index + 1];
+			uint8_t b = pixels[pixel_index + 0];
+			fb_ptr[index] = r << 16 | g << 8 | b << 0;
+		}
+	}
+}
+
 // The following will be our kernel's entry point.
 // If renaming kmain() to something else, make sure to change the
 // linker script accordingly.
@@ -431,8 +541,7 @@ extern "C" void kmain(void) {
 	cols = framebuffer->width / 8;
 	rows = framebuffer->height / 8;
 
-	// TODO: init global descriptor table
-
+	// null segment
 	set_gdt_entry(&gdt_table, 0, 0, 0, 0, 0);
 	// kernel code segment
 	set_gdt_entry(
@@ -472,26 +581,19 @@ extern "C" void kmain(void) {
 
 	load_gdt(&gdt_descriptor);
 
-	uint64_t offset = executable_address_request.response->virtual_base -
-	                  executable_address_request.response->physical_base;
-
-	// TODO: init interupt descriptor table
+	// sets all entry to asm handlers
 	for (uint64_t i = 0; i < 256; i++) {
-		set_IDT_entry(&idtr, i, (uint64_t)unknown_handler, 0);
+		set_IDT_entry(&idtr, i, isr_table[i], 0);
 	}
-	set_IDT_entry(&idtr, 0x6, (uint64_t)iop_handler, 0);
-	set_IDT_entry(&idtr, 0x8, (uint64_t)double_fault_handler, 0);
-	set_IDT_entry(&idtr, 0xD, (uint64_t)gp_handler, 0);
-	set_IDT_entry(&idtr, 0xE, (uint64_t)pf_handler, 0);
 	idt_reg.limit = sizeof(Idtr) - 1;
 	idt_reg.base = (uint64_t)&idtr.idts;
+	// clear/disable interupts
 	asm("cli");
+
 	load_idt(&idt_reg);
 	// enable interupts
 	asm("sti");
 
-	// TODO: load physical memory in virtual memory for kernel(identity) 0
-	// -> 0x100000000 write page map lvl 4/5(default 4) entry to %%cr3
 	Physical_memory::initialize();
 	Virtual_memory::initialize();
 
@@ -514,17 +616,25 @@ extern "C" void kmain(void) {
 		ACPI_SDT_header *header =
 			(ACPI_SDT_header *)(root_xsdt->pointer_to_other_sdt[i] +
 		                        memory_offset);
-		// FACP APIC HPET WAET(could ignore) BGRT
-		if (memcmp(header->Signature, "FACP", 4) == 0) {
-		}
 
 		const char signature[5] = {0, 0, 0, 0, 0};
 		memcpy((void *)signature, (void *)header->Signature, 4);
-		printf("%s(0x%x) %u %u\n", signature, *(uint32_t *)header->Signature,
-		       header->Revision, header->Length);
+		// FACP APIC HPET WAET(could ignore) BGRT
+		if (memcmp(header->Signature, "FACP", 4) == 0) {
+			printf("%s %u %u\n", signature, header->Revision, header->Length);
+		} else if (memcmp(header->Signature, "APIC", 4) == 0) {
+			printf("%s %u %u\n", signature, header->Revision, header->Length);
+		} else if (memcmp(header->Signature, "HPET", 4) == 0) {
+			printf("%s %u %u\n", signature, header->Revision, header->Length);
+		} else if (memcmp(header->Signature, "BGRT", 4) == 0) {
+			printf("%s %u %u\n", signature, header->Revision, header->Length);
+			BGRT *bgrt = (BGRT *)header;
+			display_BGRT(bgrt);
+		} else if (memcmp(header->Signature, "WAET", 4) == 0) {
+		} else {
+			printf("%s %u %u\n", signature, header->Revision, header->Length);
+		}
 	}
-
-	// clear_screen(0x1d1f21);
 
 	// We're done, just hang...
 	hcf();

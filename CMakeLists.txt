@@ -6,6 +6,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project(myos CXX ASM_NASM)
 
 set(SOURCES 
+	./src/GDT.asm
+	./src/interupts.asm
 	./src/main.cpp
 	./src/physicalmem.cpp
 	./src/virtualmem.cpp
@@ -13,7 +15,6 @@ set(SOURCES
 	./src/limine_requests.cpp
 	./src/interupts.cpp
 	./src/GDT.cpp
-	./src/GDT.asm
 )
 #set_property(SOURCE ./src/GDT.asm APPEND PROPERTY COMPILE_OPTIONS "-x" "assembler-with-cpp")
 
