@@ -73,14 +73,19 @@ void put_char(char c) {
 			if (pixel) {
 				fb_ptr[y * framebuffer->width + x] = 0xFFFFFF;
 			} else {
-				// fb_ptr[y * framebuffer->width + x] = 0x000000;
+				fb_ptr[y * framebuffer->width + x] =
+					background_color; // 0x000000;
 			}
 		}
 	}
 	cursor.x++;
 	if (cursor.x == cols) {
 		cursor.x = 0;
-		cursor.y++;
+		if (cursor.y == rows) {
+			cursor.y = 0;
+		} else {
+			cursor.y++;
+		}
 	}
 }
 
@@ -176,7 +181,11 @@ void printf(const char *fmt, ...) {
 		if (fmt[i] != '%') {
 			if (fmt[i] == '\n') {
 				cursor.x = 0;
-				cursor.y += 1;
+				if (cursor.y == rows) {
+					cursor.y = 0;
+				} else {
+					cursor.y++;
+				}
 			} else {
 				put_char(fmt[i]);
 			}
