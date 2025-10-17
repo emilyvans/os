@@ -1,6 +1,8 @@
+#ifndef INCLUDE_GDT_HPP_
+#define INCLUDE_GDT_HPP_
 #include <stdint.h>
 
-enum class GDT_accessbyte_flags {
+enum class GDTAccessbyteFlags {
 	accessed = 1 << 0,
 	// read only applies to code segments
 	read = 1 << 1,
@@ -19,27 +21,27 @@ enum class GDT_accessbyte_flags {
 	present = 1 << 7,
 };
 
-inline GDT_accessbyte_flags operator|(GDT_accessbyte_flags a,
-                                      GDT_accessbyte_flags b) {
-	return (GDT_accessbyte_flags)((uint8_t)a | (uint8_t)b);
+inline GDTAccessbyteFlags operator|(GDTAccessbyteFlags a,
+                                    GDTAccessbyteFlags b) {
+	return (GDTAccessbyteFlags)((uint8_t)a | (uint8_t)b);
 }
 
-enum class GDT_flags {
+enum class GDTFlags {
 	long_mode_segemnt = 1 << 1,
 	protected_mode_segment = 1 << 2,
 	page_granularity = 1 << 3,
 };
 
-inline GDT_flags operator|(GDT_flags a, GDT_flags b) {
-	return (GDT_flags)((uint8_t)a | (uint8_t)b);
+inline GDTFlags operator|(GDTFlags a, GDTFlags b) {
+	return (GDTFlags)((uint8_t)a | (uint8_t)b);
 }
 
-struct GDT_descriptor {
+struct GDTDescriptor {
 	uint16_t Size;
 	uint64_t Offset;
 } __attribute__((packed, aligned(0x1000)));
 
-struct GDT_entry {
+struct GDTEntry {
 	uint16_t Limit0;
 	uint16_t Base0;
 	uint8_t Base1;
@@ -48,12 +50,15 @@ struct GDT_entry {
 	uint8_t Base2;
 } __attribute__((packed));
 
-struct GDT_table {
-	GDT_entry entries[256];
+struct GDT {
+	GDTEntry entries[256];
 };
 
-void set_gdt_entry(GDT_table *table, uint8_t i, uint32_t base, uint32_t limit,
+void set_gdt_entry(GDT *table, uint8_t i, uint32_t base, uint32_t limit,
                    uint8_t flags, uint8_t access_byte);
 
+void init_GDT();
+
 // i don't know how this function works. but the function is defined in gdt.asm
-extern "C" void load_gdt(GDT_descriptor *gdt_descriptor);
+extern "C" void load_gdt(GDTDescriptor *gdt_descriptor);
+#endif // INCLUDE_GDT_HPP_

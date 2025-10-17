@@ -1,4 +1,4 @@
-#include "physicalmem.hpp"
+#include "physical_memory.hpp"
 #include "limine.h"
 #include "limine_requests.hpp"
 #include "utils.hpp"
@@ -40,14 +40,14 @@ struct Bitmap {
 private:
 	uint8_t *buffer;
 	uint64_t length;
-	friend void Physical_memory::initialize();
+	friend void physicalmemory::initialize();
 } bitmap;
 
 uint64_t highest_address = 0;
 uint64_t free_mem = 0;
 uint64_t lowest_usable_page = UINT64_MAX;
 
-void Physical_memory::initialize() {
+void physicalmemory::initialize() {
 	limine_hhdm_response *hhdm_response = hhdm_request.response;
 	limine_memmap_response *memmap_response = memmap_request.response;
 	for (uint64_t i = 0; i < memmap_response->entry_count; i++) {
@@ -92,7 +92,7 @@ void Physical_memory::initialize() {
 	}
 }
 
-void *Physical_memory::kalloc(uint64_t pages) {
+void *physicalmemory::kalloc(uint64_t pages) {
 	if (pages == 0) {
 		return nullptr;
 	}
@@ -112,4 +112,11 @@ void *Physical_memory::kalloc(uint64_t pages) {
 	}
 
 	return nullptr;
+}
+
+void physicalmemory::kfree(void *address, uint64_t page_count) {
+	for (uint64_t addr = (uint64_t)address; addr < (page_count * 4096);
+	     addr += 4096) {
+		bitmap.reset(addr / 4096);
+	}
 }

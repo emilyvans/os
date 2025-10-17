@@ -1,7 +1,9 @@
+#ifndef INCLUDE_INTERRUPTS_HPP_
+#define INCLUDE_INTERRUPTS_HPP_
 #include <stddef.h>
 #include <stdint.h>
 
-struct Idt {
+struct IDTEntry {
 	uint16_t address_low = 0;
 	uint16_t selector = 0;
 	uint8_t ist = 0;
@@ -11,17 +13,17 @@ struct Idt {
 	uint32_t reserved = 0;
 } __attribute__((packed));
 
-struct Idtr {
-	Idt idts[256];
+struct InterruptDescriptorTable {
+	IDTEntry entries[256];
 };
-struct Idtrr {
+struct IDTRegister {
 	uint16_t limit;
 	uint64_t base;
 } __attribute__((packed, aligned(0x1000)));
 
 extern "C" uint64_t isr_table[256];
 
-struct interrupt_frame {
+struct InterruptFrame {
 	size_t r15;
 	size_t r14;
 	size_t r13;
@@ -46,9 +48,14 @@ struct interrupt_frame {
 	size_t ss;
 };
 
-void set_IDT_entry(Idtr *idtr, uint64_t i, uint64_t entry, uint8_t dpl);
-void load_idt(Idtrr *idt_reg);
+void set_IDT_entry(InterruptDescriptorTable *idtr, uint64_t i, uint64_t entry,
+                   uint8_t dpl);
+void load_IDT(IDTRegister *idt_reg);
+
+void init_IDT();
 
 // RAX RBX RCX RDX RSI RDI (rsp rbp) R8 R9 R10 R11 R12 R13 R14 R15
 
-extern "C" void interrupt_handler(struct interrupt_frame *frame);
+extern "C" void interrupt_handler(struct InterruptFrame *frame);
+
+#endif // INCLUDE_INTERRUPTS_HPP_

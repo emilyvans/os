@@ -1,3 +1,5 @@
+#ifndef INCLUDE_VIRTUALMEMORY_HPP_
+#define INCLUDE_VIRTUALMEMORY_HPP_
 #include <stdint.h>
 
 // P = address in the page
@@ -23,15 +25,15 @@
 // 1			| Read/Write
 // 0			| Present
 
-struct Page_table {
+struct PageTable {
 	uint64_t PTE[512];
 };
 
-struct Page_directory {
+struct PageDirectory {
 	uint64_t PDE[512];
 };
 
-struct Page_directory_pointer_table {
+struct PageDirectoryPointerTable {
 	uint64_t PDPTE[512];
 };
 
@@ -39,9 +41,9 @@ struct PML4Table {
 	uint64_t PML4E[512];
 };
 
-namespace Virtual_memory {
+namespace virtualmemory {
 
-enum map_flags {
+enum MapFlags {
 	Execute_disable_flag = (uint64_t)1 << 63,
 	Accessed_flag = 1 << 5,
 	Cache_disable_flag = 1 << 4,
@@ -68,4 +70,5 @@ void set_current_pagemap(PML4Table *pagemap);
 
 void swap_to_kernel_pagemap();
 
-} // namespace Virtual_memory
+} // namespace virtualmemory
+#endif // INCLUDE_VIRTUALMEMORY_HPP_

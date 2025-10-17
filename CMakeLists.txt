@@ -7,14 +7,19 @@ project(myos CXX ASM_NASM)
 
 set(SOURCES 
 	./src/GDT.asm
-	./src/interupts.asm
+	./src/interrupts.asm
 	./src/main.cpp
-	./src/physicalmem.cpp
-	./src/virtualmem.cpp
+	./src/physical_memory.cpp
+	./src/virtual_memory.cpp
 	./src/utils.cpp
 	./src/limine_requests.cpp
-	./src/interupts.cpp
+	./src/interrupts.cpp
 	./src/GDT.cpp
+	./src/panic.cpp
+	./src/console.cpp
+	./src/screen.cpp
+	./src/init.cpp
+	./src/acpi.cpp
 )
 #set_property(SOURCE ./src/GDT.asm APPEND PROPERTY COMPILE_OPTIONS "-x" "assembler-with-cpp")
 
