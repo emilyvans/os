@@ -18,6 +18,11 @@ void init_console(uint64_t new_cols, uint64_t new_rows, uint64_t new_scale) {
 	scale = new_scale;
 }
 
+void clear_console() {
+	cursor = {0, 0};
+	clear_screen();
+}
+
 void put_char(char character) {
 	uint64_t start_y = cursor.y * 8 * scale;
 	uint64_t start_x = cursor.x * 8 * scale;

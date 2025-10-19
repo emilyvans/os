@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 void init_console(uint64_t new_cols, uint64_t new_rows, uint64_t new_scale);
+void clear_console();
 uint64_t strlen(const char *str);
 void number(char *buffer, uint64_t num, uint64_t base = 10);
 void put_char(char c);

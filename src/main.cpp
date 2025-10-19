@@ -1,5 +1,6 @@
 #include "GDT.hpp"
 #include "acpi.hpp"
+#include "asm.hpp"
 #include "console.hpp"
 #include "init.hpp"
 #include "interrupts.hpp"
@@ -7,6 +8,7 @@
 #include "limine_requests.hpp"
 #include "panic.hpp"
 #include "physical_memory.hpp"
+#include "pic.hpp"
 #include "screen.hpp"
 #include "utils.hpp"
 #include "virtual_memory.hpp"
@@ -80,6 +82,7 @@ void print(uint64_t original_number, uint64_t base = 10) {
 }*/
 
 void print_entry(IDTEntry entry) {
+	clear_console();
 	printf("%x %u %b %b %x %x %u 0x%x\n", entry.address_low, entry.selector,
 	       entry.ist, entry.flags, entry.address_mid, entry.address_high,
 	       entry.reserved,
@@ -89,12 +92,14 @@ void print_entry(IDTEntry entry) {
 }
 
 void print_entry(GDTEntry entry) {
+	clear_console();
 	printf("%x %x %x %b %b %x\n", entry.Limit0, entry.Base0, entry.Base1,
 	       entry.Accessbyte, entry.Limit1_Flags, entry.Base2);
 }
 
 void pf_handler(InterruptFrame *frame) {
 	clear_screen(background_color);
+	clear_console();
 	printf("page fault\ntype: %x\nip: %x\ncs: %x\nflags: %x\nsp: %x\nss: "
 	       "%x\nerror code: %x\n",
 	       0xE, frame->rip, frame->cs, frame->flags, frame->sp, frame->ss,
@@ -102,27 +107,44 @@ void pf_handler(InterruptFrame *frame) {
 	hcf();
 }
 void double_fault_handler(InterruptFrame *frame) {
+	clear_console();
 	(void)frame; // to remove warning
-	printf("double fault");
+	printf("double fault\n");
 	hcf();
 }
 void gp_handler(InterruptFrame *frame) {
+	clear_console();
 	(void)frame; // to remove warning
-	printf("general protation");
+	printf("general protation\n");
 	hcf();
 }
 void iop_handler(InterruptFrame *frame) {
+	clear_console();
 	(void)frame; // to remove warning
-	printf("invalid opcode");
+	printf("invalid opcode\n");
 	hcf();
 }
+
+void PIC_timer_handler(InterruptFrame *frame) {
+	printf("timer\n");
+	for (uint64_t i = 0; i < 9999999; i++) {
+	}
+	PIC_send_EOI(0);
+}
+
+void keyboard_interrupt_handler(InterruptFrame *frame) {
+	uint8_t key_code_byte = inb(0x60);
+	printf("0x%x ", key_code_byte);
+	PIC_send_EOI(1);
+}
+
 void unknown_handler(InterruptFrame *frame) {
-	printf("unknow exception\nnumber: %x", frame->interupt_nr);
+	clear_console();
+	printf("unknow exception\nnumber: %x\n", frame->interupt_nr);
 	hcf();
 }
 
 void interrupt_handler(InterruptFrame *frame) {
-	clear_screen(background_color);
 	switch (frame->interupt_nr) {
 	case 0x6:
 		iop_handler(frame);
@@ -135,6 +157,12 @@ void interrupt_handler(InterruptFrame *frame) {
 		break;
 	case 0xE:
 		pf_handler(frame);
+		break;
+	case 0x20:
+		PIC_timer_handler(frame);
+		break;
+	case 0x21:
+		keyboard_interrupt_handler(frame);
 		break;
 	default:
 		unknown_handler(frame);
@@ -171,8 +199,9 @@ extern "C" void kmain(void) {
 
 	init_GDT();
 	init_IDT();
+
+	init_PIC();
 	/*
-	    init_PIC();
 	    disable_PIC();
 	*/
 

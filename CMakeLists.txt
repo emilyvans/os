@@ -20,6 +20,8 @@ set(SOURCES
 	./src/screen.cpp
 	./src/init.cpp
 	./src/acpi.cpp
+	./src/pic.cpp
+	./src/asm.cpp
 )
 #set_property(SOURCE ./src/GDT.asm APPEND PROPERTY COMPILE_OPTIONS "-x" "assembler-with-cpp")
 
