@@ -31,7 +31,7 @@ void put_char(char character) {
 	cursor.x++;
 	if (cursor.x == cols) {
 		cursor.x = 0;
-		if (cursor.y == rows) {
+		if (cursor.y == rows - 1) {
 			cursor.y = 0;
 		} else {
 			cursor.y++;
@@ -83,7 +83,7 @@ void vprintf(const char *fmt, va_list arg_list) {
 		if (fmt[i] != '%') {
 			if (fmt[i] == '\n') {
 				cursor.x = 0;
-				if (cursor.y == rows) {
+				if (cursor.y == rows - 1) {
 					cursor.y = 0;
 				} else {
 					cursor.y++;
