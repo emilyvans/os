@@ -41,7 +41,6 @@ void init_GDT() {
 		(uint8_t)(GDTAccessbyteFlags::read |
 	              GDTAccessbyteFlags::code_data_segemnt |
 	              GDTAccessbyteFlags::present));
-	// TODO: fix permission for user segements
 
 	// user code segment
 	set_gdt_entry(
@@ -49,6 +48,7 @@ void init_GDT() {
 		(uint8_t)(GDTFlags::page_granularity | GDTFlags::long_mode_segemnt),
 		(uint8_t)(GDTAccessbyteFlags::read | GDTAccessbyteFlags::executable |
 	              GDTAccessbyteFlags::code_data_segemnt |
+	              GDTAccessbyteFlags::ring_3_access |
 	              GDTAccessbyteFlags::present));
 	// user data segment
 	set_gdt_entry(
@@ -56,6 +56,7 @@ void init_GDT() {
 		(uint8_t)(GDTFlags::page_granularity | GDTFlags::long_mode_segemnt),
 		(uint8_t)(GDTAccessbyteFlags::read |
 	              GDTAccessbyteFlags::code_data_segemnt |
+	              GDTAccessbyteFlags::ring_3_access |
 	              GDTAccessbyteFlags::present));
 
 	GDTDescriptor gdt_descriptor = {.Size = sizeof(GDT) - 1,
