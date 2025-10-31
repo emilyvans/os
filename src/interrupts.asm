@@ -43,7 +43,7 @@ global isr_table
 
 extern interrupt_handler
 
-interupt_handler_common:
+interrupt_handler_common:
 	mov rax, 1
 	mov rbx, 2
 	mov rcx, 3
@@ -71,18 +71,18 @@ interupt_handler_common:
 
 
 %macro isr_noerror 1
-interupt_handler_%1:
+interrupt_handler_%1:
 	push qword 0 ; dummy errorcode
 	push qword %1; interurupt number
 	cli
-	jmp interupt_handler_common
+	jmp interrupt_handler_common
 %endmacro
 
 %macro isr_error 1
-interupt_handler_%1:
+interrupt_handler_%1:
 	push qword %1; interurupt number
 	cli
-	jmp interupt_handler_common
+	jmp interrupt_handler_common
 %endmacro
 
 %assign i 0
@@ -96,7 +96,7 @@ isr_noerror i
 %endrep
 
 %macro INTERRUPT_NAME 1
-	dq interupt_handler_%1
+	dq interrupt_handler_%1
 %endmacro
 
 isr_table:

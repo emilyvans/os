@@ -10,10 +10,13 @@
 #define ALIGN_DOWN(A, B) ((A / B) * B)
 
 extern "C" void *memcpy(void *__restrict dest, const void *__restrict src,
-                        size_t n);
-extern "C" void *memset(void *s, int c, size_t n);
-extern "C" void *memmove(void *dest, const void *src, size_t n);
-extern "C" int memcmp(const void *s1, const void *s2, size_t n);
+                        size_t count);
+
+extern "C" void *memset(void *address, int number, size_t count);
+
+extern "C" void *memmove(void *dest, const void *src, size_t count);
+
+extern "C" int memcmp(const void *address1, const void *address2, size_t count);
 
 void print(const char *fmt);
 

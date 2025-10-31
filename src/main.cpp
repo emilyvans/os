@@ -98,12 +98,16 @@ void print_entry(GDTEntry entry) {
 }
 
 void pf_handler(InterruptFrame *frame) {
-	clear_screen(background_color);
-	clear_console();
-	printf("page fault\ntype: %x\nip: %x\ncs: %x\nflags: %x\nsp: %x\nss: "
-	       "%x\nerror code: %x\n",
+	// clear_screen(background_color);
+	// clear_console();
+	uint64_t fault_address;
+
+	// CR2 contains the linear address that caused the fault
+	asm volatile("mov %%cr2, %0" : "=r"(fault_address));
+	printf("\npage fault\ntype: %x\nip: %x\ncs: %x\nflags: %x\nsp: %x\nss: "
+	       "%x\nerror code: %x\noffending address: 0x%x",
 	       0xE, frame->rip, frame->cs, frame->flags, frame->sp, frame->ss,
-	       frame->error_code);
+	       frame->error_code, fault_address);
 	hcf();
 }
 void double_fault_handler(InterruptFrame *frame) {
@@ -200,7 +204,7 @@ extern "C" void kmain(void) {
 	init_GDT();
 	init_IDT();
 
-	init_PIC();
+	// init_PIC();
 	/*
 	    disable_PIC();
 	*/
@@ -208,7 +212,16 @@ extern "C" void kmain(void) {
 	physicalmemory::initialize();
 	virtualmemory::initialize();
 
+	printf("ttt\n");
+
 	init_ACPI();
+	/*
+	    asm volatile("mov $60, %%rax\n\t"   // sys_exit
+	                 "xor %%rdi, %%rdi\n\t" // exit(0)
+	                 "syscall"
+	                 :
+	                 :
+	                 : "%rax", "%rdi");*/
 
 	// We're done, just hang...
 	hcf();

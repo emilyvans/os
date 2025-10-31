@@ -33,6 +33,7 @@ void put_char(char character) {
 		cursor.x = 0;
 		if (cursor.y == rows - 1) {
 			cursor.y = 0;
+			clear_console();
 		} else {
 			cursor.y++;
 		}
