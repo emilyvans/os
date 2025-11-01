@@ -1,4 +1,5 @@
 #include "virtual_memory.hpp"
+#include "console.hpp"
 #include "limine.h"
 #include "limine_requests.hpp"
 #include "physical_memory.hpp"
@@ -7,6 +8,15 @@
 void print(uint64_t original_number, uint64_t base);
 PML4Table *kernel_map = 0;
 PML4Table *current_map = 0;
+
+void clear_page(PhysicalAddress physical_address) {
+	uint64_t address = physical_address + hhdm_request.response->offset;
+	for (uint64_t i = address; i < address + 4096; i += 8) {
+		uint64_t *addr = (uint64_t *)i;
+		*addr = 0;
+		(void)addr;
+	}
+}
 
 void virtualmemory::initialize() {
 	limine_executable_file_response *executable_file_response =
@@ -19,6 +29,7 @@ void virtualmemory::initialize() {
 	limine_memmap_response *memmap_response = memmap_request.response;
 
 	kernel_map = (PML4Table *)physicalmemory::kalloc(sizeof(PML4Table) / 4096);
+	clear_page((PhysicalAddress)kernel_map);
 
 	for (uint64_t i = 0; i < executable_file_response->executable_file->size;
 	     i += 4096) {
@@ -27,7 +38,7 @@ void virtualmemory::initialize() {
 		         present_flag | readwrite_flag);
 	}
 
-	for (uint64_t i = 0; i < 0x100000000; i += 4096) {
+	for (uint64_t i = 0; i < 0x10000000000; i += 4096) {
 		map_page(kernel_map, hhdm_response->offset + i, i,
 		         present_flag | readwrite_flag);
 	}
@@ -87,9 +98,9 @@ void virtualmemory::map_page(PML4Table *root, uint64_t virtual_address,
 	uint64_t pt_index = (virtual_address >> 12) & 0x1FF;
 
 	if (!(root->PML4E[pml4_index] & present_flag)) {
-		PageDirectoryPointerTable *table =
-			(PageDirectoryPointerTable *)physicalmemory::kalloc(
-				sizeof(PageDirectoryPointerTable) / 4096);
+		PhysicalAddress table =
+			physicalmemory::kalloc(sizeof(PageDirectoryPointerTable) / 4096);
+		clear_page(table);
 		uint64_t entry = (uint64_t)table & address_mask;
 		root->PML4E[pml4_index] =
 			entry | present_flag | readwrite_flag | user_flag;
@@ -99,8 +110,9 @@ void virtualmemory::map_page(PML4Table *root, uint64_t virtual_address,
 	                                  hhdm_response->offset);
 
 	if (!(pdpt->PDPTE[pdpt_index] & present_flag)) {
-		PageDirectory *directory = (PageDirectory *)physicalmemory::kalloc(
-			sizeof(PageDirectory) / 4096);
+		PhysicalAddress directory =
+			physicalmemory::kalloc(sizeof(PageDirectory) / 4096);
+		clear_page(directory);
 		uint64_t entry = (uint64_t)directory & address_mask;
 		pdpt->PDPTE[pdpt_index] =
 			entry | present_flag | readwrite_flag | user_flag;
@@ -111,8 +123,9 @@ void virtualmemory::map_page(PML4Table *root, uint64_t virtual_address,
 	                      hhdm_response->offset);
 
 	if (!(page_directory->PDE[pd_index] & present_flag)) {
-		PageTable *table =
-			(PageTable *)physicalmemory::kalloc(sizeof(PageTable) / 4096);
+		PhysicalAddress table =
+			physicalmemory::kalloc(sizeof(PageTable) / 4096);
+		clear_page(table);
 		uint64_t entry = (uint64_t)table & address_mask;
 		page_directory->PDE[pd_index] =
 			entry | present_flag | readwrite_flag | user_flag;

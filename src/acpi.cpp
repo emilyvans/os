@@ -32,9 +32,9 @@ void init_ACPI() {
 		memcpy((void *)signature, (void *)header->Signature, 4);
 		// FACP APIC HPET WAET(could ignore) BGRT
 		if (memcmp(header->Signature, "FACP", 4) == 0) {
-			printf("%s %u %u\n", signature, header->Revision, header->Length);
+			printf("%s %u %u ", signature, header->Revision, header->Length);
 		} else if (memcmp(header->Signature, "APIC", 4) == 0) {
-			printf("%s %u %u\n", signature, header->Revision, header->Length);
+			printf("%s %u %u ", signature, header->Revision, header->Length);
 			MADT *madt = (MADT *)header;
 			(void)madt;
 			uint64_t interrupt_controler_array_start =
@@ -50,13 +50,14 @@ void init_ACPI() {
 				interrupt_controler_array_entry += controller->size;
 			}
 		} else if (memcmp(header->Signature, "HPET", 4) == 0) {
-			printf("%s %u %u\n", signature, header->Revision, header->Length);
+			printf("%s %u %u ", signature, header->Revision, header->Length);
 		} else if (memcmp(header->Signature, "BGRT", 4) == 0) {
+			printf("%s %u %u ", signature, header->Revision, header->Length);
 			BGRT *bgrt = (BGRT *)header;
 			display_BGRT(bgrt);
 		} else if (memcmp(header->Signature, "WAET", 4) == 0) {
 		} else {
-			printf("%s %u %u\n", signature, header->Revision, header->Length);
+			printf("%s %u %u ", signature, header->Revision, header->Length);
 		}
 	}
 }
@@ -92,6 +93,8 @@ void display_BGRT(BGRT *bgrt) {
 		return;
 	}
 
+	printf("probe1 ");
+
 	uint8_t *pixels =
 		(uint8_t *)(bgrt->image_address + bitmap_ptr->pixel_byte_offset +
 	                hhdm_request.response->offset);
@@ -101,14 +104,16 @@ void display_BGRT(BGRT *bgrt) {
 	                      31) /
 	                     32) *
 	                    4;
+	printf("probe2 ");
 
 	BitmapDIB info_header = bitmap_ptr->info_header;
 
 	uint64_t image_page_count = ALIGN_UP(
 		info_header.width * info_header.height * sizeof(uint32_t), 4096);
-	void *physical_address = physicalmemory::kalloc(image_page_count);
+	PhysicalAddress physical_address = physicalmemory::kalloc(image_page_count);
 	uint32_t *buffer = (uint32_t *)((uint64_t)physical_address +
 	                                hhdm_request.response->offset);
+	printf("probe3 ");
 
 	for (int32_t y = 0; y < info_header.height; y++) {
 		for (int32_t x = 0; x < info_header.width; x++) {
@@ -121,9 +126,12 @@ void display_BGRT(BGRT *bgrt) {
 			buffer[index] = r << 16 | g << 8 | b << 0;
 		}
 	}
+	printf("probe4 ");
 
 	image_blit(buffer, bgrt->image_x_offset, bgrt->image_y_offset,
 	           info_header.width, info_header.height);
+	printf("probe4 ");
 
 	physicalmemory::kfree(physical_address, image_page_count);
+	printf("probe5 ");
 }

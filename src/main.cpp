@@ -117,7 +117,7 @@ void double_fault_handler(InterruptFrame *frame) {
 	hcf();
 }
 void gp_handler(InterruptFrame *frame) {
-	clear_console();
+	// clear_console();
 	(void)frame; // to remove warning
 	printf("general protation\n");
 	hcf();

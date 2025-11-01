@@ -3,9 +3,11 @@
 #include "limine.h"
 #include <stdint.h>
 
+typedef uint64_t PhysicalAddress;
+
 namespace physicalmemory {
 void initialize();
-void *kalloc(uint64_t page_count);
-void kfree(void *address, uint64_t page_count);
+PhysicalAddress kalloc(uint64_t page_count);
+void kfree(PhysicalAddress address, uint64_t page_count);
 } // namespace physicalmemory
 #endif // INCLUDE_PHYSICALMEMORY_HPP_

@@ -1,6 +1,8 @@
 #include "physical_memory.hpp"
+#include "console.hpp"
 #include "limine.h"
 #include "limine_requests.hpp"
+#include "panic.hpp"
 #include "utils.hpp"
 #include <stdint.h>
 
@@ -35,7 +37,7 @@ struct Bitmap {
 		buffer[byte_index] &= byte;
 	}
 
-	uint64_t get_length() { return length / 8; }
+	uint64_t get_length() { return length * 8; }
 
 private:
 	uint8_t *buffer;
@@ -60,7 +62,9 @@ void physicalmemory::initialize() {
 		}
 	}
 
-	uint64_t bitmap_size = ALIGN_UP((highest_address / 4096 / 8), 4096);
+	uint64_t bitmap_minimum_size = highest_address / 4096 / 8;
+
+	uint64_t bitmap_size = ALIGN_UP(bitmap_minimum_size, 4096);
 
 	for (uint64_t i = 0; i < memmap_response->entry_count; i++) {
 		limine_memmap_entry *entry = memmap_response->entries[i];
@@ -92,29 +96,31 @@ void physicalmemory::initialize() {
 	}
 }
 
-void *physicalmemory::kalloc(uint64_t pages) {
+PhysicalAddress physicalmemory::kalloc(uint64_t pages) {
 	if (pages == 0) {
-		return nullptr;
+		printf("zero page alloc");
+		hcf();
+		return 0;
 	}
 
 	uint64_t count = 0;
 
-	for (uint64_t i = bitmap.get_length(); i >= lowest_usable_page; i++) {
+	for (uint64_t i = lowest_usable_page; i <= bitmap.get_length(); i++) {
 		if (!bitmap[i]) {
 			count++;
 			if (count == pages) {
 				bitmap.set(i);
-				return (void *)(i * 4096);
+				return i * 4096;
 			}
 		} else {
 			count = 0;
 		}
 	}
 
-	return nullptr;
+	return 0;
 }
 
-void physicalmemory::kfree(void *address, uint64_t page_count) {
+void physicalmemory::kfree(PhysicalAddress address, uint64_t page_count) {
 	for (uint64_t addr = (uint64_t)address; addr < (page_count * 4096);
 	     addr += 4096) {
 		bitmap.reset(addr / 4096);
