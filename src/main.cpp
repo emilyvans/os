@@ -1,15 +1,14 @@
 #include "GDT.hpp"
 #include "acpi.hpp"
-#include "asm.hpp"
 #include "console.hpp"
 #include "init.hpp"
 #include "interrupts.hpp"
+#include "keyboard.hpp"
 #include "limine.h"
 #include "limine_requests.hpp"
 #include "panic.hpp"
 #include "physical_memory.hpp"
 #include "pic.hpp"
-#include "screen.hpp"
 #include "utils.hpp"
 #include "virtual_memory.hpp"
 #include <stdarg.h>
@@ -111,34 +110,33 @@ void pf_handler(InterruptFrame *frame) {
 	hcf();
 }
 void double_fault_handler(InterruptFrame *frame) {
-	clear_console();
 	(void)frame; // to remove warning
+	clear_console();
 	printf("double fault\n");
 	hcf();
 }
 void gp_handler(InterruptFrame *frame) {
-	// clear_console();
 	(void)frame; // to remove warning
+	// clear_console();
 	printf("general protation\n");
 	hcf();
 }
 void iop_handler(InterruptFrame *frame) {
-	clear_console();
 	(void)frame; // to remove warning
+	clear_console();
 	printf("invalid opcode\n");
 	hcf();
 }
 
-void PIC_timer_handler(InterruptFrame *frame) {
+void PIC_timer_handler() {
 	printf("timer\n");
 	for (uint64_t i = 0; i < 9999999; i++) {
 	}
 	PIC_send_EOI(0);
 }
 
-void keyboard_interrupt_handler(InterruptFrame *frame) {
-	uint8_t key_code_byte = inb(0x60);
-	printf("0x%x ", key_code_byte);
+void keyboard_interrupt_handler() {
+	keyboard_handler();
 	PIC_send_EOI(1);
 }
 
@@ -163,10 +161,10 @@ void interrupt_handler(InterruptFrame *frame) {
 		pf_handler(frame);
 		break;
 	case 0x20:
-		PIC_timer_handler(frame);
+		PIC_timer_handler();
 		break;
 	case 0x21:
-		keyboard_interrupt_handler(frame);
+		keyboard_interrupt_handler();
 		break;
 	default:
 		unknown_handler(frame);
@@ -204,7 +202,7 @@ extern "C" void kmain(void) {
 	init_GDT();
 	init_IDT();
 
-	// init_PIC();
+	init_PIC();
 	/*
 	    disable_PIC();
 	*/

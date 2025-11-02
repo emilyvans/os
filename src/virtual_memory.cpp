@@ -38,7 +38,7 @@ void virtualmemory::initialize() {
 		         present_flag | readwrite_flag);
 	}
 
-	for (uint64_t i = 0; i < 0x10000000000; i += 4096) {
+	for (uint64_t i = 0; i < 0x300000000; i += 4096) {
 		map_page(kernel_map, hhdm_response->offset + i, i,
 		         present_flag | readwrite_flag);
 	}

@@ -22,6 +22,7 @@ set(SOURCES
 	./src/acpi.cpp
 	./src/pic.cpp
 	./src/asm.cpp
+	./src/keyboard.cpp
 )
 #set_property(SOURCE ./src/GDT.asm APPEND PROPERTY COMPILE_OPTIONS "-x" "assembler-with-cpp")
 

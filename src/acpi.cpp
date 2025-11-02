@@ -54,7 +54,7 @@ void init_ACPI() {
 		} else if (memcmp(header->Signature, "BGRT", 4) == 0) {
 			printf("%s %u %u ", signature, header->Revision, header->Length);
 			BGRT *bgrt = (BGRT *)header;
-			display_BGRT(bgrt);
+			// display_BGRT(bgrt);
 		} else if (memcmp(header->Signature, "WAET", 4) == 0) {
 		} else {
 			printf("%s %u %u ", signature, header->Revision, header->Length);
