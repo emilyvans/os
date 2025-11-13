@@ -339,16 +339,6 @@ void handle_ps2_command() {
 	command_active = false;
 }
 
-bool is_break_code(uint8_t key_code) {
-	bool status = false;
-	for (uint8_t i = 0; i < 8; i++) {
-		if (key_code_buffer[i] == 0) {
-			break;
-		}
-	}
-	return status;
-}
-
 void print_key_name(uint8_t key_code) {
 	switch (key_code) {
 	case key_code::escape_key:
