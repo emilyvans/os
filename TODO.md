@@ -1,8 +1,8 @@
-# todo list
+# TODO list
 - [-] keyboard support
-- [ ] disk driver
 - [ ] shell program
+- [ ] disk driver
 - [ ] ELF loader
-- [ ] syscalls with int 50
+- [ ] system calls with interrupt 50
 - [ ] scheduler
 - [ ] audio driver

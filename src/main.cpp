@@ -1,5 +1,6 @@
 #include "GDT.hpp"
 #include "acpi.hpp"
+#include "asm.hpp"
 #include "console.hpp"
 #include "init.hpp"
 #include "interrupts.hpp"
@@ -136,7 +137,7 @@ void PIC_timer_handler() {
 }
 
 void keyboard_interrupt_handler() {
-	keyboard_handler();
+	ps2_keyboard_handler();
 	PIC_send_EOI(1);
 }
 
@@ -203,6 +204,11 @@ extern "C" void kmain(void) {
 	init_IDT();
 
 	init_PIC();
+	ps2_send_command(0xF3, 0);
+	ps2_disable_keyset_translation();
+	ps2_set_keyset(1);
+	ps2_get_current_keyset();
+
 	/*
 	    disable_PIC();
 	*/
@@ -210,9 +216,7 @@ extern "C" void kmain(void) {
 	physicalmemory::initialize();
 	virtualmemory::initialize();
 
-	printf("ttt\n");
-
-	init_ACPI();
+	// init_ACPI();
 	/*
 	    asm volatile("mov $60, %%rax\n\t"   // sys_exit
 	                 "xor %%rdi, %%rdi\n\t" // exit(0)

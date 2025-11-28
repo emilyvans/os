@@ -1,6 +1,16 @@
 #ifndef INCLUDE_KEYBOARD_HPP_
 #define INCLUDE_KEYBOARD_HPP_
+#include "stdint.h"
 
-void keyboard_handler();
+bool set_key_pressed_handler(void (*handler)(uint8_t key_code));
+bool set_key_released_handler(void (*handler)(uint8_t key_code));
+void reset_key_pressed_handler();
+void reset_key_released_handler();
+
+void ps2_disable_keyset_translation();
+void ps2_keyboard_handler();
+void ps2_send_command(uint8_t command, uint8_t data);
+void ps2_set_keyset(uint8_t key_set);
+void ps2_get_current_keyset();
 
 #endif // INCLUDE_KEYBOARD_HPP_
