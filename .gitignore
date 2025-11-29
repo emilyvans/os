@@ -1,12 +1,4 @@
-.cache/clangd/index
-bin
+.cache
 build
-obj/src
-GNUmakefile
-a.out
-boot.asm
-build.sh
 compile_commands.json
-image.hdd
-myos
 acpica
