@@ -1,16 +1,17 @@
-#include "acpi.hpp"
-#include "console.hpp"
-#include "limine_requests.hpp"
+#include "driver/acpi.hpp"
+#include "driver/console.hpp"
+#include "driver/screen.hpp"
+#include "limine/limine_requests.hpp"
+#include "memory/physical_memory.hpp"
 #include "panic.hpp"
-#include "physical_memory.hpp"
-#include "screen.hpp"
 #include "utils.hpp"
 #include <stdint.h>
 
 void init_ACPI() {
 	uint64_t memory_offset = hhdm_request.response->offset;
 
-	RSDP *rsdp = (RSDP *)(rsdp_request.response->address + memory_offset);
+	RSDP *rsdp =
+		(RSDP *)((uint64_t)rsdp_request.response->address + memory_offset);
 
 	if (rsdp->Revision != 2) {
 		printf("rsdp revision must be 2\n");

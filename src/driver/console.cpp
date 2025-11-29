@@ -1,5 +1,5 @@
-#include "console.hpp"
-#include "screen.hpp"
+#include "driver/console.hpp"
+#include "driver/screen.hpp"
 #include <stdint.h>
 
 struct Point {

@@ -1,4 +1,4 @@
-#include "interrupts.hpp"
+#include "cpu/interrupts.hpp"
 #include <stdint.h>
 
 void set_IDT_entry(InterruptDescriptorTable *idtr, uint64_t i, uint64_t entry,

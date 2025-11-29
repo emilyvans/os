@@ -1,4 +1,4 @@
-#include "limine_requests.hpp"
+#include "limine/limine_requests.hpp"
 
 volatile struct limine_framebuffer_request framebuffer_request = {
 	.id = LIMINE_FRAMEBUFFER_REQUEST, .revision = 0, .response = NULL};

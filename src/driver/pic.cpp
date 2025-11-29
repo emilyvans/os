@@ -1,5 +1,5 @@
-#include "pic.hpp"
-#include "asm.hpp"
+#include "driver/pic.hpp"
+#include "cpu/asm.hpp"
 #include <stdint.h>
 
 #define PIC1_COMMAND 0x20

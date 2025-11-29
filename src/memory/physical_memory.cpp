@@ -1,9 +1,9 @@
-#include "physical_memory.hpp"
-#include "console.hpp"
-#include "limine.h"
-#include "limine_requests.hpp"
+#include "memory/physical_memory.hpp"
+#include "driver/console.hpp"
+#include "limine/limine_requests.hpp"
 #include "panic.hpp"
 #include "utils.hpp"
+#include <limine.h>
 #include <stdint.h>
 
 struct Bitmap {

@@ -1,8 +1,8 @@
-#include "keyboard.hpp"
-#include "asm.hpp"
-#include "console.hpp"
-#include "keycode.hpp"
-#include "spinlock.hpp"
+#include "driver/keyboard/keyboard.hpp"
+#include "cpu/asm.hpp"
+#include "cpu/spinlock.hpp"
+#include "driver/console.hpp"
+#include "driver/keyboard/keycode.hpp"
 #include <stdint.h>
 
 bool key_active[255] = {false};

@@ -1,4 +1,4 @@
-#include "asm.hpp"
+#include "cpu/asm.hpp"
 
 void outb(uint16_t address, uint8_t data) {
 	asm volatile("outb %b0, %w1" : : "a"(data), "Nd"(address) : "memory");

@@ -1,6 +1,6 @@
 #ifndef INCLUDE_SCREEN_HPP_
 #define INCLUDE_SCREEN_HPP_
-#include "limine.h"
+#include <limine.h>
 #include <stdint.h>
 
 void init_screen(limine_framebuffer *new_framebuffer,

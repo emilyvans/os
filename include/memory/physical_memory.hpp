@@ -1,6 +1,5 @@
 #ifndef INCLUDE_PHYSICALMEMORY_HPP_
 #define INCLUDE_PHYSICALMEMORY_HPP_
-#include "limine.h"
 #include <stdint.h>
 
 typedef uint64_t PhysicalAddress;

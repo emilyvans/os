@@ -1,7 +1,7 @@
-#include "screen.hpp"
+#include "driver/screen.hpp"
 #include "8x8font.h"
-#include "limine.h"
-#include <stddef.h>
+#include "stddef.h"
+#include <limine.h>
 #include <stdint.h>
 
 uint32_t background_color = 0;

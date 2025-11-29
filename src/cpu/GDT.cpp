@@ -1,4 +1,4 @@
-#include "GDT.hpp"
+#include "cpu/GDT.hpp"
 
 // B = Base address
 // L = Limit

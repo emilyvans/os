@@ -1,8 +1,8 @@
-#include "virtual_memory.hpp"
-#include "console.hpp"
-#include "limine.h"
-#include "limine_requests.hpp"
-#include "physical_memory.hpp"
+#include "memory/virtual_memory.hpp"
+#include "driver/console.hpp"
+#include "limine/limine_requests.hpp"
+#include "memory/physical_memory.hpp"
+#include <limine.h>
 #include <stdint.h>
 
 void print(uint64_t original_number, uint64_t base);

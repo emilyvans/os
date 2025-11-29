@@ -1,20 +1,19 @@
-#include "GDT.hpp"
-#include "acpi.hpp"
-#include "asm.hpp"
-#include "console.hpp"
-#include "init.hpp"
-#include "interrupts.hpp"
-#include "keyboard.hpp"
-#include "limine.h"
-#include "limine_requests.hpp"
+#include "cpu/GDT.hpp"
+#include "cpu/asm.hpp"
+#include "cpu/interrupts.hpp"
+#include "driver/acpi.hpp"
+#include "driver/console.hpp"
+#include "driver/init.hpp"
+#include "driver/keyboard/keyboard.hpp"
+#include "driver/pic.hpp"
+#include "limine/limine_requests.hpp"
+#include "memory/physical_memory.hpp"
+#include "memory/virtual_memory.hpp"
 #include "panic.hpp"
-#include "physical_memory.hpp"
-#include "pic.hpp"
+#include "stdbool.h"
+#include "stddef.h"
 #include "utils.hpp"
-#include "virtual_memory.hpp"
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stddef.h>
+#include <limine.h>
 #include <stdint.h>
 
 #define background_color 0x1d1f21
@@ -23,19 +22,19 @@
 // base revision described by the Limine boot protocol specification.
 // See specification for further info.
 
-__attribute__((
-	used, section(".limine_requests"))) static volatile LIMINE_BASE_REVISION(3);
+__attribute__((used, section(".limine_requests"))) static volatile uint64_t
+	limine_base_revision[] = LIMINE_BASE_REVISION(3);
 
 // Finally, define the start and end markers for the Limine requests.
 // These can also be moved anywhere, to any .c file, as seen fit.
-__attribute__((used,
-               section(".limine_requests_"
-                       "start"))) static volatile LIMINE_REQUESTS_START_MARKER;
-
 __attribute__((
 	used,
-	section(
-		".limine_requests_end"))) static volatile LIMINE_REQUESTS_END_MARKER;
+	section(".limine_requests_"
+            "start"))) static volatile uint64_t limine_requests_start_marker[] =
+	LIMINE_REQUESTS_START_MARKER;
+
+__attribute__((used, section(".limine_requests_end"))) static volatile uint64_t
+	limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
 void print(const char *fmt) {
 	char *to_print = (char *)fmt;
@@ -178,7 +177,7 @@ void interrupt_handler(InterruptFrame *frame) {
 extern "C" void kmain(void) {
 	// Ensure the bootloader actually understands our base revision (see
 	// spec).
-	if (LIMINE_BASE_REVISION_SUPPORTED == false) {
+	if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
 		hcf();
 	}
 

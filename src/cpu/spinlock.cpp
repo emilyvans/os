@@ -1,5 +1,5 @@
-#include "spinlock.hpp"
-#include "console.hpp"
+#include "cpu/spinlock.hpp"
+#include "driver/console.hpp"
 
 void fence() {
 	asm("SFENCE");
