@@ -10,5 +10,6 @@ void number(char *buffer, uint64_t num, uint64_t base = 10);
 void put_char(char c);
 void vprintf(const char *fmt, va_list arg_list);
 void printf(const char *fmt, ...);
+void console_set_uart_enabled();
 
 #endif // INCLUDE_CONSOLE_HPP_

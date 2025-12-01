@@ -3,6 +3,7 @@
 #include "cpu/spinlock.hpp"
 #include "driver/console.hpp"
 #include "driver/keyboard/keycode.hpp"
+#include "utils.hpp"
 #include <stdint.h>
 
 bool key_active[255] = {false};
@@ -334,6 +335,7 @@ uint8_t command_type = 0;
 uint8_t command_data = 0;
 uint8_t command_output_buffer[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t command_bytes_recieved = 0;
+bool buffer_dirty = false;
 
 void (*pressed_handler)(uint8_t key_code) = nullptr;
 void (*released_handler)(uint8_t key_code) = nullptr;
@@ -359,44 +361,19 @@ void reset_key_pressed_handler() {
 void reset_key_released_handler() {
 	released_handler = nullptr;
 }
+void print_key_name(uint8_t key_code);
 
 void on_key_pressed(uint8_t key_code) {
 	if (pressed_handler != nullptr) {
 		pressed_handler(key_code);
 	}
+	print_key_name(key_code);
 }
-
-void print_key_name(uint8_t key_code);
 
 void on_key_released(uint8_t key_code) {
 	if (released_handler != nullptr) {
 		released_handler(key_code);
 	}
-	print_key_name(key_code);
-}
-
-void ps2_set_keyset(uint8_t key_set) {
-	ps2_send_command(0xF0, key_set);
-}
-
-void ps2_get_current_keyset() {
-	ps2_send_command(0xF0, 0);
-}
-
-// TODO: implement PS/2 command
-void ps2_send_command(uint8_t command, uint8_t data) {
-	keyboard_command_lock.lock();
-	command_active = true;
-	command_type = command;
-	command_data = data;
-	while ((inb(0x64) & 0b10) == 0b10)
-		io_wait();
-	outb(0x60, command);
-	while ((inb(0x64) & 0b10) == 0b10)
-		io_wait();
-	outb(0x60, data);
-	while ((inb(0x64) & 0b10) == 0b10)
-		io_wait();
 }
 
 void complete_command() {
@@ -408,9 +385,31 @@ void complete_command() {
 	keyboard_command_lock.unlock();
 }
 
-void handle_ps2_command(uint8_t response_byte) {
-	command_output_buffer[command_bytes_recieved] = response_byte;
-	command_bytes_recieved += 1;
+void ps2_keyboard_set_keyset(uint8_t key_set) {
+	ps2_send_command(0xF0, key_set);
+	complete_command();
+}
+
+void ps2_keyboard_get_current_keyset() {
+	ps2_send_command(0xF0, 0);
+	while (!buffer_dirty) {
+		printf("m");
+	}
+	if (command_bytes_recieved == 3) {
+		buffer_dirty = false;
+	}
+	uint8_t key_set_byte = command_output_buffer[2];
+	if (key_set_byte == 0x43) {
+		key_set = 1;
+	} else if (key_set_byte == 0x41) {
+		key_set = 2;
+	} else if (key_set_byte == 0x3f) {
+		key_set = 3;
+	}
+	complete_command();
+}
+
+void handle_ps2_command() {
 	if (command_output_buffer[0] == 0xFE) {
 		printf("resend");
 		ps2_send_command(command_type, command_data);
@@ -443,6 +442,36 @@ void handle_ps2_command(uint8_t response_byte) {
 	} break;
 	default:
 		complete_command();
+	}
+}
+
+// TODO: implement PS/2 command
+void ps2_send_command(uint8_t command, uint8_t data) {
+	keyboard_command_lock.lock();
+	command_active = true;
+	command_type = command;
+	command_data = data;
+	while ((inb(0x64) & 0b10) == 0b10)
+		io_wait();
+	outb(0x60, command);
+	while (!buffer_dirty) {
+	}
+	if (command_bytes_recieved == 1) {
+		buffer_dirty = false;
+	}
+	if (command_output_buffer[0] != 0xFA) {
+		return;
+	}
+	while ((inb(0x64) & 0b10) == 0b10)
+		io_wait();
+	outb(0x60, data);
+	while (!buffer_dirty) {
+	}
+	if (command_bytes_recieved == 2) {
+		buffer_dirty = false;
+	}
+	if (command_output_buffer[1] != 0xFA) {
+		return;
 	}
 }
 
@@ -767,21 +796,30 @@ void clear_buffer() {
 	key_code_bytes_recieved = 0;
 }
 
-void ps2_keyboard_handler() {
-	while ((inb(0x64) & 0b1) == 0)
-		io_wait();
+void ps2_on_interrupt() {
 	uint8_t key_code_byte = inb(0x60);
+	if (command_active) {
+		command_output_buffer[command_bytes_recieved] = key_code_byte;
+		command_bytes_recieved += 1;
+	} else {
+		key_code_buffer[key_code_bytes_recieved] = key_code_byte;
+		key_code_bytes_recieved += 1;
+	}
+	__atomic_store_n(&buffer_dirty, true, 3);
+}
+
+void ps2_handler() {
+	if (buffer_dirty) {
+		if (!command_active) {
+			ps2_keyboard_handler();
+		}
+		buffer_dirty = false;
+	}
+}
+
+void ps2_keyboard_handler() {
 	// TODO: implement key code conversion
 	// TODO: implement keyrepeating
-	if (command_active) {
-		handle_ps2_command(key_code_byte);
-		return;
-	}
-	if (key_code_byte == 0xFA)
-		return;
-
-	key_code_buffer[key_code_bytes_recieved] = key_code_byte;
-	key_code_bytes_recieved += 1;
 #if 0
 	for (uint64_t i = 0; i < key_code_bytes_recieved; i++) {
 		printf("0x%x,", key_code_buffer[i]);
@@ -795,9 +833,6 @@ void ps2_keyboard_handler() {
 			bool is_key = true;
 			bool is_break = false;
 			for (uint64_t j = 0; j < 6; j++) {
-				if (key_code_byte == 0) {
-					break;
-				}
 				if (key_bytes[j] != key_code_buffer[j]) {
 					uint8_t byte_index = 0;
 					if (key_code_bytes_recieved == 4) {

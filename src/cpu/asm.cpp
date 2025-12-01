@@ -6,7 +6,7 @@ void outb(uint16_t address, uint8_t data) {
 
 uint8_t inb(uint16_t address) {
 	uint8_t data;
-	asm volatile("inb %w1, %b0" : "=a"(data) : "Nd"(address) : "memory");
+	asm volatile("inb %1, %0" : "=a"(data) : "d"(address));
 	return data;
 }
 

@@ -6,6 +6,7 @@
 #include "driver/init.hpp"
 #include "driver/keyboard/keyboard.hpp"
 #include "driver/pic.hpp"
+#include "driver/uart.hpp"
 #include "limine/limine_requests.hpp"
 #include "memory/physical_memory.hpp"
 #include "memory/virtual_memory.hpp"
@@ -136,7 +137,7 @@ void PIC_timer_handler() {
 }
 
 void keyboard_interrupt_handler() {
-	ps2_keyboard_handler();
+	ps2_on_interrupt();
 	PIC_send_EOI(1);
 }
 
@@ -198,15 +199,16 @@ extern "C" void kmain(void) {
 	uint32_t scale = 2;
 
 	init_display(framebuffer, background_color, scale);
+	uart_init();
 
 	init_GDT();
 	init_IDT();
 
 	init_PIC();
-	ps2_send_command(0xF3, 0);
+	// ps2_send_command(0xF3, 0);
 	ps2_disable_keyset_translation();
-	ps2_set_keyset(1);
-	ps2_get_current_keyset();
+	ps2_keyboard_set_keyset(1);
+	ps2_keyboard_get_current_keyset();
 
 	/*
 	    disable_PIC();
@@ -215,7 +217,15 @@ extern "C" void kmain(void) {
 	physicalmemory::initialize();
 	virtualmemory::initialize();
 
-	// init_ACPI();
+	init_ACPI();
+
+	for (;;) {
+		ps2_handler();
+		if (uart_data_recieved()) {
+			char c = uart_recieve();
+			printf("%c", c);
+		}
+	}
 	/*
 	    asm volatile("mov $60, %%rax\n\t"   // sys_exit
 	                 "xor %%rdi, %%rdi\n\t" // exit(0)

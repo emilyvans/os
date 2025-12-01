@@ -1,5 +1,6 @@
 #include "driver/console.hpp"
 #include "driver/screen.hpp"
+#include "driver/uart.hpp"
 #include <stdint.h>
 
 struct Point {
@@ -11,6 +12,7 @@ uint64_t cols = 0;
 uint64_t rows = 0;
 Point cursor = {0, 0};
 uint64_t scale = 2;
+bool uart_enabled = false;
 
 void init_console(uint64_t new_cols, uint64_t new_rows, uint64_t new_scale) {
 	cols = new_cols;
@@ -26,7 +28,23 @@ void clear_console() {
 void put_char(char character) {
 	uint64_t start_y = cursor.y * 8 * scale;
 	uint64_t start_x = cursor.x * 8 * scale;
-	draw_char(character, start_y, start_x, 0xFFFFFF, scale);
+	if (character == '\n') {
+		cursor.x = 0;
+		if (cursor.y == rows - 1) {
+			cursor.y = 0;
+		} else {
+			cursor.y++;
+		}
+		uart_send('\r');
+	} else if (character == '\r') {
+		cursor.x = 0;
+	} else {
+		draw_char(character, start_y, start_x, 0xFFFFFF, scale);
+	}
+
+	if (uart_enabled) {
+		uart_send(character);
+	}
 
 	cursor.x++;
 	if (cursor.x == cols) {
@@ -82,16 +100,7 @@ uint64_t strlen(const char *str) {
 void vprintf(const char *fmt, va_list arg_list) {
 	for (uint64_t i = 0; i < strlen(fmt); i++) {
 		if (fmt[i] != '%') {
-			if (fmt[i] == '\n') {
-				cursor.x = 0;
-				if (cursor.y == rows - 1) {
-					cursor.y = 0;
-				} else {
-					cursor.y++;
-				}
-			} else {
-				put_char(fmt[i]);
-			}
+			put_char(fmt[i]);
 			continue;
 		}
 		i += 1;
@@ -145,4 +154,8 @@ void printf(const char *fmt, ...) {
 	va_start(arg_list, fmt);
 	vprintf(fmt, arg_list);
 	va_end(arg_list);
+}
+
+void console_set_uart_enabled() {
+	uart_enabled = true;
 }
