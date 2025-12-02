@@ -1,0 +1,7 @@
+[submodule "external/Limine"]
+	path = external/Limine
+	url = https://codeberg.org/Limine/Limine.git
+
+[submodule "external/limine-protocol"]
+	path = external/limine-protocol
+	url = https://codeberg.org/Limine/limine-protocol.git
