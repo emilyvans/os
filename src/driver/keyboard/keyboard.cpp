@@ -335,7 +335,7 @@ uint8_t command_type = 0;
 uint8_t command_data = 0;
 uint8_t command_output_buffer[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t command_bytes_recieved = 0;
-bool buffer_dirty = false;
+volatile bool buffer_dirty = false;
 
 void (*pressed_handler)(uint8_t key_code) = nullptr;
 void (*released_handler)(uint8_t key_code) = nullptr;
@@ -377,10 +377,10 @@ void on_key_released(uint8_t key_code) {
 }
 
 void complete_command() {
+	command_active = false;
 	for (uint8_t i = 0; i < 8; i++) {
 		command_output_buffer[i] = 0;
 	}
-	command_active = false;
 	command_bytes_recieved = 0;
 	keyboard_command_lock.unlock();
 }
@@ -393,7 +393,6 @@ void ps2_keyboard_set_keyset(uint8_t key_set) {
 void ps2_keyboard_get_current_keyset() {
 	ps2_send_command(0xF0, 0);
 	while (!buffer_dirty) {
-		printf("m");
 	}
 	if (command_bytes_recieved == 3) {
 		buffer_dirty = false;
@@ -805,19 +804,21 @@ void ps2_on_interrupt() {
 		key_code_buffer[key_code_bytes_recieved] = key_code_byte;
 		key_code_bytes_recieved += 1;
 	}
-	__atomic_store_n(&buffer_dirty, true, 3);
+	buffer_dirty = true;
 }
 
 void ps2_handler() {
 	if (buffer_dirty) {
-		if (!command_active) {
-			ps2_keyboard_handler();
-		}
+		ps2_keyboard_handler();
 		buffer_dirty = false;
 	}
 }
 
 void ps2_keyboard_handler() {
+	for (uint64_t j = 0; j < 6; j++) {
+		printf("%x ", key_code_buffer[j]);
+		printf("\n");
+	}
 	// TODO: implement key code conversion
 	// TODO: implement keyrepeating
 #if 0
@@ -891,6 +892,14 @@ void ps2_keyboard_handler() {
 	}
 }
 
+void ps2_flush_keycode_buffer() {
+	key_code_bytes_recieved = 0;
+	buffer_dirty = false;
+	for (uint64_t i = 0; i < 8; i++) {
+		key_code_buffer[i] = 0;
+	}
+}
+
 void ps2_wait_for_full_output_buffer() {
 	while (!(inb(0x64) & 0x01))
 		io_wait();
@@ -901,12 +910,12 @@ void ps2_wait_for_empty_input_buffer() {
 		io_wait();
 }
 
-void ps2_disable_keyboard_interupts() {
+void ps2_disable_keyboard() {
 	ps2_wait_for_empty_input_buffer();
 	outb(0x64, 0xAD);
 }
 
-void ps2_enable_keyboard_interupts() {
+void ps2_enable_keyboard() {
 	ps2_wait_for_empty_input_buffer();
 	outb(0x64, 0xAE);
 }
@@ -915,7 +924,11 @@ uint8_t ps2_get_controller_config() {
 	ps2_wait_for_empty_input_buffer();
 	outb(0x64, 0x20);
 	ps2_wait_for_full_output_buffer();
-	return inb(0x60);
+	uint8_t config = inb(0x60);
+	while ((inb(0x64) & 0x01)) {
+		inb(60);
+	}
+	return config;
 }
 
 void ps2_set_controller_config(uint8_t config) {
@@ -927,13 +940,14 @@ void ps2_set_controller_config(uint8_t config) {
 }
 
 void ps2_disable_keyset_translation() {
-	ps2_disable_keyboard_interupts();
-
 	uint8_t config = ps2_get_controller_config();
 
 	config &= ~(1 << 6);
+	config &= ~(1 << 4);
+	config |= 1;
 
+	ps2_disable_keyboard();
 	ps2_set_controller_config(config);
-
-	ps2_enable_keyboard_interupts();
+	ps2_enable_keyboard();
+	ps2_get_controller_config();
 }

@@ -1,5 +1,5 @@
-#ifndef INCLUDE_ACPI_HPP_
-#define INCLUDE_ACPI_HPP_
+#ifndef INCLUDE_DRIVER_ACPI_HPP_
+#define INCLUDE_DRIVER_ACPI_HPP_
 #include <stdint.h>
 
 struct GenericAddressStructure {
@@ -159,4 +159,4 @@ struct BitmapHeader {
 void init_ACPI();
 void display_BGRT(BGRT *bgrt);
 
-#endif // INCLUDE_ACPI_HPP_
+#endif // INCLUDE_DRIVER_ACPI_HPP_

@@ -13,6 +13,8 @@
 
 #define ICW4_8086 0x01
 
+#define PIC_READ_ISR 0x0B
+
 #define CASCADE_IRQ 2
 
 void init_PIC() {
@@ -43,6 +45,23 @@ void init_PIC() {
 	outb(PIC1_DATA, 1);
 	outb(PIC2_DATA, 0);
 	asm("sti");
+}
+
+uint8_t PIC_get_master_isr() {
+	outb(PIC1_COMMAND, PIC_READ_ISR);
+	io_wait();
+	return inb(PIC1_COMMAND);
+}
+
+uint8_t PIC_get_slave_isr() {
+	outb(PIC2_COMMAND, PIC_READ_ISR);
+	io_wait();
+	return inb(PIC2_COMMAND);
+}
+
+void PIC_send_master_EOI() {
+	outb(PIC1_COMMAND, PIC_EOI);
+	io_wait();
 }
 
 void PIC_send_EOI(uint8_t interrupt_number) {

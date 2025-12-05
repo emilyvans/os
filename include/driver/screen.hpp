@@ -1,5 +1,5 @@
-#ifndef INCLUDE_SCREEN_HPP_
-#define INCLUDE_SCREEN_HPP_
+#ifndef INCLUDE_DRIVER_SCREEN_HPP_
+#define INCLUDE_DRIVER_SCREEN_HPP_
 #include <limine.h>
 #include <stdint.h>
 
@@ -14,4 +14,4 @@ void clear_screen(uint32_t color);
 void image_blit(uint32_t *buffer, uint32_t start_x, uint32_t start_y,
                 uint32_t width, uint32_t height);
 
-#endif // INCLUDE_SCREEN_HPP_
+#endif // INCLUDE_DRIVER_SCREEN_HPP_

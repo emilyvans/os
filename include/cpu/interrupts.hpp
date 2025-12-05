@@ -1,5 +1,5 @@
-#ifndef INCLUDE_INTERRUPTS_HPP_
-#define INCLUDE_INTERRUPTS_HPP_
+#ifndef INCLUDE_CPU_INTERRUPTS_HPP_
+#define INCLUDE_CPU_INTERRUPTS_HPP_
 #include <stddef.h>
 #include <stdint.h>
 
@@ -58,4 +58,4 @@ void init_IDT();
 
 extern "C" void interrupt_handler(struct InterruptFrame *frame);
 
-#endif // INCLUDE_INTERRUPTS_HPP_
+#endif // INCLUDE_CPU_INTERRUPTS_HPP_

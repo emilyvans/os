@@ -1,5 +1,5 @@
-#ifndef INCLUDE_LIMINE_REQUESTS_HPP_
-#define INCLUDE_LIMINE_REQUESTS_HPP_
+#ifndef INCLUDE_LIMINE_LIMINE_REQUESTS_HPP_
+#define INCLUDE_LIMINE_LIMINE_REQUESTS_HPP_
 #include "limine.h"
 #include <stddef.h>
 
@@ -26,4 +26,4 @@ extern __attribute__((
 extern __attribute__((section(
 	".limine_requests"))) volatile struct limine_executable_address_request
 	executable_address_request;
-#endif // INCLUDE_LIMINE_REQUESTS_HPP_
+#endif // INCLUDE_LIMINE_LIMINE_REQUESTS_HPP_

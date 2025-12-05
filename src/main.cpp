@@ -148,6 +148,20 @@ void unknown_handler(InterruptFrame *frame) {
 }
 
 void interrupt_handler(InterruptFrame *frame) {
+
+	if (frame->interupt_nr == 0x27) {
+		uint8_t isr = PIC_get_master_isr();
+		if (!(isr & (1 << 7))) {
+			return;
+		}
+	} else if (frame->interupt_nr == 0x2F) {
+		uint8_t isr = PIC_get_slave_isr();
+		if (!(isr & (1 << 7))) {
+			PIC_send_master_EOI();
+			return;
+		}
+	}
+
 	switch (frame->interupt_nr) {
 	case 0x6:
 		iop_handler(frame);
@@ -203,12 +217,11 @@ extern "C" void kmain(void) {
 
 	init_GDT();
 	init_IDT();
-
 	init_PIC();
-	// ps2_send_command(0xF3, 0);
-	ps2_disable_keyset_translation();
-	ps2_keyboard_set_keyset(1);
+	ps2_keyboard_set_keyset(2);
 	ps2_keyboard_get_current_keyset();
+	ps2_disable_keyset_translation();
+	ps2_flush_keycode_buffer();
 
 	/*
 	    disable_PIC();
@@ -221,10 +234,10 @@ extern "C" void kmain(void) {
 
 	for (;;) {
 		ps2_handler();
-		if (uart_data_recieved()) {
-			char c = uart_recieve();
-			printf("%c", c);
-		}
+		// if (uart_data_recieved()) {
+		//		char c = uart_recieve();
+		//			printf("%c", c);
+		//		}
 	}
 	/*
 	    asm volatile("mov $60, %%rax\n\t"   // sys_exit

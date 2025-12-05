@@ -1,5 +1,5 @@
-#ifndef INCLUDE_GDT_HPP_
-#define INCLUDE_GDT_HPP_
+#ifndef INCLUDE_CPU_GDT_HPP_
+#define INCLUDE_CPU_GDT_HPP_
 #include <stdint.h>
 
 enum class GDTAccessbyteFlags {
@@ -61,4 +61,4 @@ void init_GDT();
 
 // i don't know how this function works. but the function is defined in gdt.asm
 extern "C" void load_gdt(GDTDescriptor *gdt_descriptor);
-#endif // INCLUDE_GDT_HPP_
+#endif // INCLUDE_CPU_GDT_HPP_

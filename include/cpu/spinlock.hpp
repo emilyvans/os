@@ -1,5 +1,5 @@
-#ifndef INCLUDE_SPINLOCK_HPP_
-#define INCLUDE_SPINLOCK_HPP_
+#ifndef INCLUDE_CPU_SPINLOCK_HPP_
+#define INCLUDE_CPU_SPINLOCK_HPP_
 
 #include <stdint.h>
 class spinlock {
@@ -12,4 +12,4 @@ private:
 	volatile int st = false;
 };
 
-#endif // INCLUDE_SPINLOCK_HPP_
+#endif // INCLUDE_CPU_SPINLOCK_HPP_

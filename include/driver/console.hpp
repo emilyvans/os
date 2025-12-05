@@ -1,5 +1,5 @@
-#ifndef INCLUDE_CONSOLE_HPP_
-#define INCLUDE_CONSOLE_HPP_
+#ifndef INCLUDE_DRIVER_CONSOLE_HPP_
+#define INCLUDE_DRIVER_CONSOLE_HPP_
 #include <stdarg.h>
 #include <stdint.h>
 
@@ -12,4 +12,4 @@ void vprintf(const char *fmt, va_list arg_list);
 void printf(const char *fmt, ...);
 void console_set_uart_enabled();
 
-#endif // INCLUDE_CONSOLE_HPP_
+#endif // INCLUDE_DRIVER_CONSOLE_HPP_

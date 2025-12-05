@@ -1,5 +1,5 @@
-#ifndef INCLUDE_KEYCODE_HPP_
-#define INCLUDE_KEYCODE_HPP_
+#ifndef INCLUDE_KEYBOARD_KEYCODE_HPP_
+#define INCLUDE_KEYBOARD_KEYCODE_HPP_
 
 namespace key_code {
 
@@ -111,4 +111,4 @@ enum key_codes {
 
 }
 
-#endif // INCLUDE_KEYCODE_HPP_
+#endif // INCLUDE_KEYBOARD_KEYCODE_HPP_

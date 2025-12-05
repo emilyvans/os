@@ -1,5 +1,5 @@
-#ifndef INCLUDE_VIRTUALMEMORY_HPP_
-#define INCLUDE_VIRTUALMEMORY_HPP_
+#ifndef INCLUDE_MEMORY_VIRTUAL_MEMORY_HPP_
+#define INCLUDE_MEMORY_VIRTUAL_MEMORY_HPP_
 #include <stdint.h>
 
 // P = address in the page
@@ -71,4 +71,4 @@ void set_current_pagemap(PML4Table *pagemap);
 void swap_to_kernel_pagemap();
 
 } // namespace virtualmemory
-#endif // INCLUDE_VIRTUALMEMORY_HPP_
+#endif // INCLUDE_MEMORY_VIRTUAL_MEMORY_HPP_
