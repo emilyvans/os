@@ -11,6 +11,7 @@
 #include "memory/physical_memory.hpp"
 #include "memory/virtual_memory.hpp"
 #include "panic.hpp"
+#include "programs/shell.hpp"
 #include "stdbool.h"
 #include "stddef.h"
 #include "utils.hpp"
@@ -218,9 +219,9 @@ extern "C" void kmain(void) {
 	init_GDT();
 	init_IDT();
 	init_PIC();
-	ps2_keyboard_set_keyset(2);
+	// ps2_keyboard_set_keyset(1);
 	ps2_keyboard_get_current_keyset();
-	ps2_disable_keyset_translation();
+	//  ps2_disable_keyset_translation();
 	ps2_flush_keycode_buffer();
 
 	/*
@@ -231,9 +232,11 @@ extern "C" void kmain(void) {
 	virtualmemory::initialize();
 
 	init_ACPI();
+	init_shell();
 
 	for (;;) {
 		ps2_handler();
+		shell_loop();
 		// if (uart_data_recieved()) {
 		//		char c = uart_recieve();
 		//			printf("%c", c);

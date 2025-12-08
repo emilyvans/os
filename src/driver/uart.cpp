@@ -5,7 +5,7 @@
 
 #define PORT 0x3F8
 
-void uart_set_baud_rate(uint16_t baud_rate) {
+bool uart_set_baud_rate(uint16_t baud_rate) {
 	uint16_t divisor = 115200 / baud_rate;
 	uint8_t least = divisor & 0xff;
 	uint8_t most = (divisor >> 8) & 0xff;
@@ -30,8 +30,17 @@ void uart_set_baud_rate(uint16_t baud_rate) {
 	outb(PORT + 0, 0x8D);
 	io_wait();
 
-	while (inb(PORT) != 0x8D)
-		;
+	bool found = false;
+
+	for (uint64_t i = 0; (i < 999999) && !found; i++) {
+		if (inb(PORT) == 0x8D) {
+			found = true;
+		}
+		io_wait();
+	}
+	if (!found) {
+		return false;
+	}
 
 	outb(PORT + 4, 0x0F);
 	io_wait();
@@ -39,11 +48,13 @@ void uart_set_baud_rate(uint16_t baud_rate) {
 	io_wait();
 	outb(PORT + 2, 0xC7);
 	io_wait();
+	return true;
 }
 
 void uart_init() {
-	uart_set_baud_rate(9600);
-	console_set_uart_enabled();
+	if (uart_set_baud_rate(9600)) {
+		console_set_uart_enabled();
+	}
 }
 
 void uart_send(char c) {

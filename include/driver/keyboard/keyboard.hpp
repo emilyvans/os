@@ -9,11 +9,13 @@ void reset_key_released_handler();
 
 void ps2_handler();
 void ps2_on_interrupt();
-void ps2_disable_keyset_translation();
 void ps2_keyboard_handler();
 void ps2_send_command(uint8_t command, uint8_t data);
-void ps2_keyboard_set_keyset(uint8_t key_set);
-void ps2_keyboard_get_current_keyset();
 void ps2_flush_keycode_buffer();
+
+// doesn't work correctly on qemu and real hardware. both modern
+// void ps2_disable_keyset_translation();
+// void ps2_keyboard_set_keyset(uint8_t key_set);
+void ps2_keyboard_get_current_keyset();
 
 #endif // INCLUDE_KEYBOARD_KEYBOARD_HPP_

@@ -38,7 +38,7 @@ uint8_t key_set_1_translation_buffer[255][6] = {
 	[key_code::nine_key] = {0x0A, 0, 0, 0, 0, 0},
 	[key_code::zero_key] = {0x0B, 0, 0, 0, 0, 0},
 	[key_code::minus_key] = {0x0C, 0, 0, 0, 0, 0},
-	[key_code::equels_key] = {0x0D, 0, 0, 0, 0, 0},
+	[key_code::equals_key] = {0x0D, 0, 0, 0, 0, 0},
 	[key_code::backspace_key] = {0x0E, 0, 0, 0, 0, 0},
 	[key_code::insert_key] = {0xE0, 0x52, 0, 0, 0, 0},
 	[key_code::home_key] = {0xE0, 0x47, 0, 0, 0, 0},
@@ -144,7 +144,7 @@ uint8_t key_set_2_translation_buffer[255][8] = {
 	[key_code::nine_key] = {},
 	[key_code::zero_key] = {},
 	[key_code::minus_key] = {},
-	[key_code::equels_key] = {},
+	[key_code::equals_key] = {},
 	[key_code::backspace_key] = {},
 	[key_code::insert_key] = {},
 	[key_code::home_key] = {},
@@ -250,7 +250,7 @@ uint8_t key_set_3_translation_buffer[255][2] = {
 	[key_code::nine_key] = {},
 	[key_code::zero_key] = {},
 	[key_code::minus_key] = {},
-	[key_code::equels_key] = {},
+	[key_code::equals_key] = {},
 	[key_code::backspace_key] = {},
 	[key_code::insert_key] = {},
 	[key_code::home_key] = {},
@@ -367,7 +367,6 @@ void on_key_pressed(uint8_t key_code) {
 	if (pressed_handler != nullptr) {
 		pressed_handler(key_code);
 	}
-	print_key_name(key_code);
 }
 
 void on_key_released(uint8_t key_code) {
@@ -450,8 +449,9 @@ void ps2_send_command(uint8_t command, uint8_t data) {
 	command_active = true;
 	command_type = command;
 	command_data = data;
-	while ((inb(0x64) & 0b10) == 0b10)
+	while ((inb(0x64) & 0b10) == 0b10) {
 		io_wait();
+	}
 	outb(0x60, command);
 	while (!buffer_dirty) {
 	}
@@ -461,8 +461,9 @@ void ps2_send_command(uint8_t command, uint8_t data) {
 	if (command_output_buffer[0] != 0xFA) {
 		return;
 	}
-	while ((inb(0x64) & 0b10) == 0b10)
+	while ((inb(0x64) & 0b10) == 0b10) {
 		io_wait();
+	}
 	outb(0x60, data);
 	while (!buffer_dirty) {
 	}
@@ -560,7 +561,7 @@ void print_key_name(uint8_t key_code) {
 	case key_code::minus_key:
 		printf("minus");
 		break;
-	case key_code::equels_key:
+	case key_code::equals_key:
 		printf("equels");
 		break;
 	case key_code::backspace_key:
@@ -815,10 +816,12 @@ void ps2_handler() {
 }
 
 void ps2_keyboard_handler() {
+#if 0
 	for (uint64_t j = 0; j < 6; j++) {
 		printf("%x ", key_code_buffer[j]);
 		printf("\n");
 	}
+#endif
 	// TODO: implement key code conversion
 	// TODO: implement keyrepeating
 #if 0
@@ -873,7 +876,8 @@ void ps2_keyboard_handler() {
 			}
 		}
 	} else if (key_set == 2) {
-		printf("key set not supported: 2");
+		printf("key set not supported: 2, scancode: %x", key_code_buffer[0]);
+		clear_buffer();
 		return;
 		for (uint64_t i = 0; i < 256; i++) {
 			for (uint64_t j = 0; j < 8; j++) {
@@ -881,6 +885,7 @@ void ps2_keyboard_handler() {
 		}
 	} else if (key_set == 3) {
 		printf("key set not supported: 3");
+		clear_buffer();
 		return;
 		for (uint64_t i = 0; i < 256; i++) {
 			for (uint64_t j = 0; j < 2; j++) {
@@ -901,33 +906,46 @@ void ps2_flush_keycode_buffer() {
 }
 
 void ps2_wait_for_full_output_buffer() {
-	while (!(inb(0x64) & 0x01))
+	while (!(inb(0x64) & 0x01)) {
+		//		for (uint64_t i = 0; i < 99999; i++) {
 		io_wait();
+		//		}
+		printf("status: %b", inb(0x64));
+	}
 }
 
 void ps2_wait_for_empty_input_buffer() {
-	while (inb(0x64) & 0x02)
+	while (inb(0x64) & 0x02) {
 		io_wait();
+	}
 }
 
 void ps2_disable_keyboard() {
 	ps2_wait_for_empty_input_buffer();
 	outb(0x64, 0xAD);
+	ps2_wait_for_empty_input_buffer();
+	outb(0x64, 0xA7);
+	io_wait();
 }
 
 void ps2_enable_keyboard() {
 	ps2_wait_for_empty_input_buffer();
 	outb(0x64, 0xAE);
+	io_wait();
 }
 
 uint8_t ps2_get_controller_config() {
+	while (inb(0x64) & 0x01) {
+		inb(0x60);
+		io_wait();
+	}
+	printf("before");
 	ps2_wait_for_empty_input_buffer();
 	outb(0x64, 0x20);
+	printf("send");
 	ps2_wait_for_full_output_buffer();
 	uint8_t config = inb(0x60);
-	while ((inb(0x64) & 0x01)) {
-		inb(60);
-	}
+	printf("recieved");
 	return config;
 }
 
@@ -940,14 +958,14 @@ void ps2_set_controller_config(uint8_t config) {
 }
 
 void ps2_disable_keyset_translation() {
+	ps2_disable_keyboard();
+	io_wait();
 	uint8_t config = ps2_get_controller_config();
 
 	config &= ~(1 << 6);
 	config &= ~(1 << 4);
 	config |= 1;
 
-	ps2_disable_keyboard();
 	ps2_set_controller_config(config);
 	ps2_enable_keyboard();
-	ps2_get_controller_config();
 }

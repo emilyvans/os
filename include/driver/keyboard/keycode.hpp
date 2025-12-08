@@ -32,7 +32,7 @@ enum key_codes {
 	nine_key,
 	zero_key,
 	minus_key,
-	equels_key,
+	equals_key,
 	backspace_key,
 	insert_key,
 	home_key,

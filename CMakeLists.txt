@@ -29,6 +29,7 @@ set(SOURCES
 	./src/driver/keyboard/keyboard.cpp
 	./src/cpu/spinlock.cpp
 	./src/driver/uart.cpp
+	./src/programs/shell.cpp
 )
 
 add_executable(myos ${SOURCES})

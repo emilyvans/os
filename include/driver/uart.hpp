@@ -2,7 +2,7 @@
 #define INCLUDE_DRIVER_UART_HPP_
 #include <stdint.h>
 
-void uart_set_baud_rate(uint16_t baud_rate);
+bool uart_set_baud_rate(uint16_t baud_rate);
 void uart_init();
 bool uart_data_recieved();
 void uart_send(char c);
