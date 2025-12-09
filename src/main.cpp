@@ -1,5 +1,4 @@
 #include "cpu/GDT.hpp"
-#include "cpu/asm.hpp"
 #include "cpu/interrupts.hpp"
 #include "driver/acpi.hpp"
 #include "driver/console.hpp"
@@ -14,7 +13,6 @@
 #include "programs/shell.hpp"
 #include "stdbool.h"
 #include "stddef.h"
-#include "utils.hpp"
 #include <limine.h>
 #include <stdint.h>
 
@@ -38,50 +36,6 @@ __attribute__((
 __attribute__((used, section(".limine_requests_end"))) static volatile uint64_t
 	limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
-void print(const char *fmt) {
-	char *to_print = (char *)fmt;
-
-	while ((uint32_t)*to_print != 0) {
-		put_char(*to_print);
-		to_print++;
-	}
-	return;
-}
-
-void print(const char *fmt, uint64_t count) {
-	char *to_print = (char *)fmt;
-	for (uint64_t i = 0; i < count; i++) {
-		put_char(*to_print);
-		to_print++;
-	}
-}
-/*
-void print(uint64_t original_number, uint64_t base = 10) {
-    char rev_num[64] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint64_t number = original_number % base;
-    uint64_t current_running_number = original_number - number;
-    current_running_number = current_running_number / base;
-    uint64_t count = 1;
-    rev_num[0] = digits[number];
-    // put_char(char(number + '0'));
-    while (current_running_number != 0) {
-        count++;
-        number = current_running_number % base;
-        current_running_number -= number;
-        current_running_number = current_running_number / base;
-        rev_num[count - 1] = digits[number];
-    }
-    if (count > 64) {
-        count = 64;
-    }
-    for (uint64_t i = count + 1; i >= 1; i--) {
-        if (rev_num[i - 1] != 0) {
-            put_char(rev_num[i - 1]);
-        }
-    }
-}*/
-
 void print_entry(IDTEntry entry) {
 	clear_console();
 	printf("%x %u %b %b %x %x %u 0x%x\n", entry.address_low, entry.selector,
@@ -99,8 +53,6 @@ void print_entry(GDTEntry entry) {
 }
 
 void pf_handler(InterruptFrame *frame) {
-	// clear_screen(background_color);
-	// clear_console();
 	uint64_t fault_address;
 
 	// CR2 contains the linear address that caused the fault
@@ -187,17 +139,11 @@ void interrupt_handler(InterruptFrame *frame) {
 	}
 }
 
-// The following will be our kernel's entry point.
-// If renaming kmain() to something else, make sure to change the
-// linker script accordingly.
 extern "C" void kmain(void) {
-	// Ensure the bootloader actually understands our base revision (see
-	// spec).
 	if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
 		hcf();
 	}
 
-	// Ensure we got a framebuffer.
 	if (framebuffer_request.response == NULL ||
 	    framebuffer_request.response->framebuffer_count < 1) {
 		hcf();
@@ -207,7 +153,6 @@ extern "C" void kmain(void) {
 		hcf();
 	}
 
-	// Fetch the first framebuffer.
 	limine_framebuffer *framebuffer =
 		framebuffer_request.response->framebuffers[0];
 
@@ -219,9 +164,7 @@ extern "C" void kmain(void) {
 	init_GDT();
 	init_IDT();
 	init_PIC();
-	// ps2_keyboard_set_keyset(1);
-	ps2_keyboard_get_current_keyset();
-	//  ps2_disable_keyset_translation();
+	// ps2_keyboard_get_current_keyset();
 	ps2_flush_keycode_buffer();
 
 	/*
@@ -234,22 +177,9 @@ extern "C" void kmain(void) {
 	init_ACPI();
 	init_shell();
 
+	// convert this to a non busy-loop
 	for (;;) {
 		ps2_handler();
 		shell_loop();
-		// if (uart_data_recieved()) {
-		//		char c = uart_recieve();
-		//			printf("%c", c);
-		//		}
 	}
-	/*
-	    asm volatile("mov $60, %%rax\n\t"   // sys_exit
-	                 "xor %%rdi, %%rdi\n\t" // exit(0)
-	                 "syscall"
-	                 :
-	                 :
-	                 : "%rax", "%rdi");*/
-
-	// We're done, just hang...
-	hcf();
 }
