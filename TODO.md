@@ -2,9 +2,12 @@
 - [-] keyboard support
     - only keyset 1 working for now
 - [x] basic UART support
-- [ ] a basic shell
+- [ ] heap memory
+- [ ] PCI driver
+    - [ ] PCI-e driver(maybe)
 - [ ] disk driver
 - [ ] ELF loader
 - [ ] system calls with interrupt 50
+- [ ] a basic shell
 - [ ] scheduler
 - [ ] audio driver

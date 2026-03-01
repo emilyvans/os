@@ -1,4 +1,5 @@
 #include "cpu/GDT.hpp"
+#include "cpu/asm.hpp"
 #include "cpu/interrupts.hpp"
 #include "driver/acpi.hpp"
 #include "driver/console.hpp"
@@ -23,7 +24,7 @@
 // See specification for further info.
 
 __attribute__((used, section(".limine_requests"))) static volatile uint64_t
-	limine_base_revision[] = LIMINE_BASE_REVISION(3);
+	limine_base_revision[] = LIMINE_BASE_REVISION(4);
 
 // Finally, define the start and end markers for the Limine requests.
 // These can also be moved anywhere, to any .c file, as seen fit.
@@ -79,13 +80,16 @@ void iop_handler(InterruptFrame *frame) {
 	(void)frame; // to remove warning
 	clear_console();
 	printf("invalid opcode\n");
+	printf("RIP: 0x%x\n", frame->rip);
+	printf("opcode byte 1: 0x%x", *(uint8_t *)frame->rip);
 	hcf();
 }
 
+uint64_t microseconds = 0;
+
 void PIC_timer_handler() {
-	printf("timer\n");
-	for (uint64_t i = 0; i < 9999999; i++) {
-	}
+	// printf("timer\n");
+	microseconds += 1;
 	PIC_send_EOI(0);
 }
 
@@ -164,22 +168,37 @@ extern "C" void kmain(void) {
 	init_GDT();
 	init_IDT();
 	init_PIC();
-	// ps2_keyboard_get_current_keyset();
-	ps2_flush_keycode_buffer();
-
-	/*
-	    disable_PIC();
-	*/
 
 	physicalmemory::initialize();
 	virtualmemory::initialize();
 
-	init_ACPI();
-	init_shell();
+	printf("free memory: %u/%u\n", physicalmemory::get_free_ram(),
+	       physicalmemory::get_total_ram());
 
+	// ps2_keyboard_get_current_keyset();
+	// ps2_flush_keycode_buffer();
+
+	init_ACPI();
+// init_shell();
+
+// Programmable interrupt timer setup
+#define PIT_CHANNEL_0 0x40
+#define PIT_CHANNEL_1 0x41
+#define PIT_CHANNEL_2 0x42
+#define PIT_MODE_COMMAND_REGISTER 0x43
+	outb(PIT_MODE_COMMAND_REGISTER, 0b00110100);
+
+	uint64_t PIT_FREQ = 1193182; // 1.193182MHZ
+	uint16_t freq = 1000;
+	uint16_t freq_divider = PIT_FREQ / freq;
+	outb(PIT_CHANNEL_0, freq_divider & 0xFF);
+	outb(PIT_CHANNEL_0, (freq_divider & 0xFF00) >> 8);
+
+	PIC_unmask_interrupt(0);
 	// convert this to a non busy-loop
 	for (;;) {
-		ps2_handler();
-		shell_loop();
+		// ps2_handler();
+		// shell_loop();
+		asm volatile("hlt");
 	}
 }

@@ -30,6 +30,7 @@ bool uart_set_baud_rate(uint16_t baud_rate) {
 	outb(PORT + 0, 0x8D);
 	io_wait();
 
+	// time-out for if uart isn't supported
 	bool found = false;
 
 	for (uint64_t i = 0; (i < 999999) && !found; i++) {

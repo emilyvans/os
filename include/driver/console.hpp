@@ -11,5 +11,9 @@ void put_char(char c);
 void vprintf(const char *fmt, va_list arg_list);
 void printf(const char *fmt, ...);
 void console_set_uart_enabled();
+void blink_cursor_off();
+void blink_cursor_on();
+void cursor_dec();
+void cursor_inc();
 
 #endif // INCLUDE_DRIVER_CONSOLE_HPP_

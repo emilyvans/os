@@ -3,15 +3,17 @@
 #include "driver/screen.hpp"
 #include "limine/limine_requests.hpp"
 #include "memory/physical_memory.hpp"
+#include "memory/virtual_memory.hpp"
 #include "panic.hpp"
 #include "utils.hpp"
 #include <stdint.h>
 
+void parse_MCFG(ACPISDTHeader *header);
+
 void init_ACPI() {
 	uint64_t memory_offset = hhdm_request.response->offset;
 
-	RSDP *rsdp =
-		(RSDP *)((uint64_t)rsdp_request.response->address + memory_offset);
+	RSDP *rsdp = (RSDP *)((uint64_t)rsdp_request.response->address);
 
 	if (rsdp->Revision != 2) {
 		printf("rsdp revision must be 2\n");
@@ -31,11 +33,11 @@ void init_ACPI() {
 
 		const char signature[5] = {0, 0, 0, 0, 0};
 		memcpy((void *)signature, (void *)header->Signature, 4);
-		// FACP APIC HPET WAET(could ignore) BGRT
+		// FACP APIC HPET MCFG WAET(could ignore) BGRT
 		if (memcmp(header->Signature, "FACP", 4) == 0) {
 			printf("%s %u %u ", signature, header->Revision, header->Length);
 		} else if (memcmp(header->Signature, "APIC", 4) == 0) {
-			printf("%s %u %u ", signature, header->Revision, header->Length);
+			printf("%s %u %u\n", signature, header->Revision, header->Length);
 			MADT *madt = (MADT *)header;
 			(void)madt;
 			uint64_t interrupt_controler_array_start =
@@ -54,9 +56,14 @@ void init_ACPI() {
 			printf("%s %u %u ", signature, header->Revision, header->Length);
 		} else if (memcmp(header->Signature, "BGRT", 4) == 0) {
 			printf("%s %u %u ", signature, header->Revision, header->Length);
-			BGRT *bgrt = (BGRT *)header;
-			// display_BGRT(bgrt);
+			// BGRT *bgrt = (BGRT *)header;
+			//  display_BGRT(bgrt);
+		} else if (memcmp(header->Signature, "MCFG", 4) == 0) {
+			printf("%s %u %u\n", signature, header->Revision, header->Length);
+			parse_MCFG(header);
+			return;
 		} else if (memcmp(header->Signature, "WAET", 4) == 0) {
+			// ignore vm helper table for windows vmsi
 		} else {
 			printf("%s %u %u ", signature, header->Revision, header->Length);
 		}
@@ -135,4 +142,59 @@ void display_BGRT(BGRT *bgrt) {
 
 	physicalmemory::kfree(physical_address, image_page_count);
 	printf("probe5 ");
+}
+
+struct MCFG_allocation {
+	uint64_t base_address;
+	uint16_t PCI_segment;
+	uint8_t start_Bus;
+	uint8_t end_bus;
+	uint32_t reserved;
+} __attribute__((packed));
+
+struct common {
+	uint16_t Vendor_ID;
+	uint16_t device_ID;
+	uint16_t command;
+	uint16_t status;
+	uint8_t revision_ID;
+	uint8_t prog_IF;
+	uint8_t subclass;
+	uint8_t class_code;
+	uint8_t cache_line_size;
+	uint8_t latency_timer;
+	uint8_t header_type;
+	uint8_t BIST;
+} __attribute__((packed));
+
+void parse_MCFG(ACPISDTHeader *header) {
+	printf("entries: %u\n", ((header->Length - sizeof(ACPISDTHeader)) /
+	                         sizeof(MCFG_allocation)));
+	MCFG_allocation *mcfg =
+		(MCFG_allocation *)(((uint64_t)header) + sizeof(ACPISDTHeader));
+
+	uint64_t ecam_virtual_base =
+		hhdm_request.response->offset + mcfg->base_address;
+	uint64_t ecam_size =
+		(mcfg->end_bus - mcfg->start_Bus + 1) * 1024 * 1024; // 1 MB per bus
+
+	for (uint64_t offset = 0; offset < ecam_size; offset += 4096) {
+		virtualmemory::map_kernel_page(ecam_virtual_base + offset,  // virtual
+		                               mcfg->base_address + offset, // physical
+		                               virtualmemory::present_flag |
+		                                   virtualmemory::Cache_disable_flag |
+		                                   virtualmemory::readwrite_flag);
+	}
+	for (uint64_t bus = mcfg->start_Bus; bus <= mcfg->end_bus; bus++) {
+		for (uint16_t dev = 0; dev < 32; dev++) {
+			volatile common *t =
+				(common *)((ecam_virtual_base) + ((uint64_t(bus) << 20) |
+			                                      (uint64_t(dev) << 15) |
+			                                      (uint64_t(0) << 12)));
+			if (t->Vendor_ID == 0xFFFF || t->class_code == 0)
+				continue;
+			printf("class: %x, subclass: %x, prog_if: %x\n", t->class_code,
+			       t->subclass, t->prog_IF);
+		}
+	}
 }

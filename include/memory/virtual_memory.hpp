@@ -63,10 +63,12 @@ constexpr uint64_t address_mask = 0xFFFFFFFFFF000;
 
 void initialize();
 
-void map_page(PML4Table *root, uint64_t virtual_address,
+void map_page(uint64_t root_physical, uint64_t virtual_address,
               uint64_t physical_address, uint64_t flags);
+void map_kernel_page(uint64_t virtual_address, uint64_t physical_address,
+                     uint64_t flags);
 
-void set_current_pagemap(PML4Table *pagemap);
+void set_current_pagemap(uint64_t pagemap);
 
 void swap_to_kernel_pagemap();
 

@@ -14,4 +14,9 @@ void clear_screen(uint32_t color);
 void image_blit(uint32_t *buffer, uint32_t start_x, uint32_t start_y,
                 uint32_t width, uint32_t height);
 
+void fill_rect(uint32_t color, uint32_t start_x, uint32_t start_y,
+               uint32_t width, uint32_t height);
+void clear_rect(uint32_t start_x, uint32_t start_y, uint32_t width,
+                uint32_t height);
+
 #endif // INCLUDE_DRIVER_SCREEN_HPP_

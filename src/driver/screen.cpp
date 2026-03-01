@@ -66,3 +66,25 @@ void image_blit(uint32_t *buffer, uint32_t start_x, uint32_t start_y,
 		}
 	}
 }
+
+void fill_rect(uint32_t color, uint32_t start_x, uint32_t start_y,
+               uint32_t width, uint32_t height) {
+	volatile uint32_t *fb_ptr = (uint32_t *)framebuffer->address;
+	for (uint32_t y = start_y; y < (start_y + height); y++) {
+		uint32_t screen_row_offset = y * framebuffer->width;
+		for (uint32_t x = start_x; x < (start_x + width); x++) {
+			fb_ptr[screen_row_offset + x] = color;
+		}
+	}
+}
+
+void clear_rect(uint32_t start_x, uint32_t start_y, uint32_t width,
+                uint32_t height) {
+	volatile uint32_t *fb_ptr = (uint32_t *)framebuffer->address;
+	for (uint32_t y = start_y; y < (start_y + height); y++) {
+		uint32_t screen_row_offset = y * framebuffer->width;
+		for (uint32_t x = start_x; x < (start_x + width); x++) {
+			fb_ptr[screen_row_offset + x] = background_color;
+		}
+	}
+}

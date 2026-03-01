@@ -41,10 +41,30 @@ void init_PIC() {
 	outb(PIC2_DATA, ICW4_8086);
 	io_wait();
 
-	// Unmask both PICs.
-	outb(PIC1_DATA, 1);
-	outb(PIC2_DATA, 0);
+	// mask both PICs.
+	outb(PIC1_DATA, 0xFF);
+	outb(PIC2_DATA, 0xFF);
 	asm("sti");
+}
+
+void PIC_mask_interrupt(uint8_t interrupt) {
+	if (interrupt < 8) {
+		uint8_t value = inb(PIC2_DATA) | (1 << interrupt);
+		outb(PIC2_DATA, value);
+	} else if (interrupt < 15) {
+		uint8_t value = inb(PIC1_DATA) | (1 << (interrupt - 8));
+		outb(PIC1_DATA, value);
+	}
+}
+
+void PIC_unmask_interrupt(uint8_t interrupt) {
+	if (interrupt < 8) {
+		uint8_t value = inb(PIC1_DATA) & ~(1 << interrupt);
+		outb(PIC1_DATA, value);
+	} else if (interrupt < 15) {
+		uint8_t value = inb(PIC2_DATA) & ~(1 << (interrupt - 8));
+		outb(PIC2_DATA, value);
+	}
 }
 
 uint8_t PIC_get_master_isr() {

@@ -1,7 +1,6 @@
 #!/bin/env bash
 qemu-system-x86_64 \
 	-enable-kvm \
-	-machine q35 \
 	-display gtk,gl=on,zoom-to-fit=off \
 	-smp 1 \
 	-cpu host,+smep,+smap,+pcid,+fsgsbase \

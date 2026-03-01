@@ -7,5 +7,7 @@ void PIC_send_EOI(uint8_t interrupt_number);
 void PIC_send_master_EOI();
 uint8_t PIC_get_master_isr();
 uint8_t PIC_get_slave_isr();
+void PIC_unmask_interrupt(uint8_t interrupt);
+void PIC_mask_interrupt(uint8_t interrupt);
 
 #endif // INCLUDE_DRIVER_PIC_HPP_

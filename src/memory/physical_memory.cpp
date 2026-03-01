@@ -47,7 +47,16 @@ private:
 
 uint64_t highest_address = 0;
 uint64_t free_mem = 0;
+uint64_t total_mem = 0;
 uint64_t lowest_usable_page = UINT64_MAX;
+
+uint64_t physicalmemory::get_total_ram() {
+	return total_mem;
+}
+
+uint64_t physicalmemory::get_free_ram() {
+	return free_mem;
+}
 
 void physicalmemory::initialize() {
 	limine_hhdm_response *hhdm_response = hhdm_request.response;
@@ -59,6 +68,7 @@ void physicalmemory::initialize() {
 				highest_address = entry->base + entry->length;
 			}
 			free_mem += entry->length;
+			total_mem += entry->length;
 		}
 	}
 
@@ -73,13 +83,13 @@ void physicalmemory::initialize() {
 				bitmap.buffer = (uint8_t *)entry->base + entry->length -
 				                bitmap_size + hhdm_response->offset;
 				bitmap.length = bitmap_size;
-				memset(bitmap.buffer, 0xFF, bitmap_size);
 				entry->length -= bitmap_size;
 				free_mem -= bitmap_size;
 				break;
 			}
 		}
 	}
+	memset(bitmap.buffer, 0xFF, bitmap_size);
 
 	for (uint64_t i = 0; i < memmap_response->entry_count; i++) {
 		limine_memmap_entry *entry = memmap_response->entries[i];
@@ -94,6 +104,7 @@ void physicalmemory::initialize() {
 			bitmap.reset((entry->base + addr) / 4096);
 		}
 	}
+	bitmap.set(0);
 }
 
 PhysicalAddress physicalmemory::kalloc(uint64_t pages) {
@@ -110,6 +121,7 @@ PhysicalAddress physicalmemory::kalloc(uint64_t pages) {
 			count++;
 			if (count == pages) {
 				bitmap.set(i);
+				free_mem -= count * 4096;
 				return i * 4096;
 			}
 		} else {
@@ -125,4 +137,5 @@ void physicalmemory::kfree(PhysicalAddress address, uint64_t page_count) {
 	     addr += 4096) {
 		bitmap.reset(addr / 4096);
 	}
+	free_mem += page_count * 4096;
 }

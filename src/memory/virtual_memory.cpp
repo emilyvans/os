@@ -2,12 +2,13 @@
 #include "driver/console.hpp"
 #include "limine/limine_requests.hpp"
 #include "memory/physical_memory.hpp"
+#include "panic.hpp"
 #include <limine.h>
 #include <stdint.h>
 
 void print(uint64_t original_number, uint64_t base);
-PML4Table *kernel_map = 0;
-PML4Table *current_map = 0;
+uint64_t kernel_map = 0;
+uint64_t current_map = 0;
 
 void clear_page(PhysicalAddress physical_address) {
 	uint64_t address = physical_address + hhdm_request.response->offset;
@@ -28,7 +29,7 @@ void virtualmemory::initialize() {
 	limine_hhdm_response *hhdm_response = hhdm_request.response;
 	limine_memmap_response *memmap_response = memmap_request.response;
 
-	kernel_map = (PML4Table *)physicalmemory::kalloc(sizeof(PML4Table) / 4096);
+	kernel_map = physicalmemory::kalloc(sizeof(PML4Table) / 4096);
 	clear_page((PhysicalAddress)kernel_map);
 
 	for (uint64_t i = 0; i < executable_file_response->executable_file->size;
@@ -37,10 +38,19 @@ void virtualmemory::initialize() {
 		         executable_address_response->physical_base + i,
 		         present_flag | readwrite_flag);
 	}
-
-	for (uint64_t i = 0; i < 0x300000000; i += 4096) {
-		map_page(kernel_map, hhdm_response->offset + i, i,
-		         present_flag | readwrite_flag);
+	for (uint64_t i = 0; i < memmap_response->entry_count; i++) {
+		limine_memmap_entry *entry = memmap_response->entries[i];
+		if (entry->type == LIMINE_MEMMAP_ACPI_TABLES ||
+		    entry->type == LIMINE_MEMMAP_ACPI_RECLAIMABLE ||
+		    entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
+		    entry->type == LIMINE_MEMMAP_RESERVED ||
+		    entry->type == LIMINE_MEMMAP_USABLE) {
+			for (uint64_t offset = 0; offset < entry->length; offset += 4096) {
+				map_page(kernel_map,
+				         hhdm_response->offset + entry->base + offset,
+				         entry->base + offset, present_flag | readwrite_flag);
+			}
+		}
 	}
 
 	uint64_t framebuffer_physical_address = 0;
@@ -73,7 +83,7 @@ void virtualmemory::initialize() {
 // 0bXXXXXXXXXXXXXXXXMMMMMMMMMpppppppppDDDDDDDDDTTTTTTTTTPPPPPPPPPPPP
 //
 // entries format
-// bits(-bits)	| meaning
+// bit(-bit)	| meaning
 // 63			| Execute Disable
 // 62-52		| Available? Unused?
 // 51-12		| bits 51-12 of the Address of next table
@@ -87,10 +97,15 @@ void virtualmemory::initialize() {
 // 1			| Read/Write
 // 0			| Present
 
-void virtualmemory::map_page(PML4Table *root, uint64_t virtual_address,
+void virtualmemory::map_page(uint64_t root_physical, uint64_t virtual_address,
                              uint64_t physical_address, uint64_t flags) {
 	limine_hhdm_response *hhdm_response = hhdm_request.response;
-	root = (PML4Table *)((uint64_t)root + hhdm_response->offset);
+	PML4Table *root =
+		(PML4Table *)((uint64_t)root_physical + hhdm_response->offset);
+
+	uint64_t upper_flags = present_flag | readwrite_flag;
+	if (flags & Cache_disable_flag)
+		upper_flags |= Cache_disable_flag;
 
 	uint64_t pml4_index = (virtual_address >> 39) & 0x1FF;
 	uint64_t pdpt_index = (virtual_address >> 30) & 0x1FF;
@@ -102,8 +117,7 @@ void virtualmemory::map_page(PML4Table *root, uint64_t virtual_address,
 			physicalmemory::kalloc(sizeof(PageDirectoryPointerTable) / 4096);
 		clear_page(table);
 		uint64_t entry = (uint64_t)table & address_mask;
-		root->PML4E[pml4_index] =
-			entry | present_flag | readwrite_flag | user_flag;
+		root->PML4E[pml4_index] = entry | upper_flags;
 	}
 	PageDirectoryPointerTable *pdpt =
 		(PageDirectoryPointerTable *)((root->PML4E[pml4_index] & address_mask) +
@@ -114,8 +128,7 @@ void virtualmemory::map_page(PML4Table *root, uint64_t virtual_address,
 			physicalmemory::kalloc(sizeof(PageDirectory) / 4096);
 		clear_page(directory);
 		uint64_t entry = (uint64_t)directory & address_mask;
-		pdpt->PDPTE[pdpt_index] =
-			entry | present_flag | readwrite_flag | user_flag;
+		pdpt->PDPTE[pdpt_index] = entry | upper_flags;
 	}
 
 	PageDirectory *page_directory =
@@ -127,8 +140,7 @@ void virtualmemory::map_page(PML4Table *root, uint64_t virtual_address,
 			physicalmemory::kalloc(sizeof(PageTable) / 4096);
 		clear_page(table);
 		uint64_t entry = (uint64_t)table & address_mask;
-		page_directory->PDE[pd_index] =
-			entry | present_flag | readwrite_flag | user_flag;
+		page_directory->PDE[pd_index] = entry | upper_flags;
 	}
 
 	PageTable *page_table =
@@ -138,7 +150,12 @@ void virtualmemory::map_page(PML4Table *root, uint64_t virtual_address,
 	page_table->PTE[pt_index] = (physical_address & address_mask) | flags;
 }
 
-void virtualmemory::set_current_pagemap(PML4Table *pagemap) {
+void virtualmemory::map_kernel_page(uint64_t virtual_address,
+                                    uint64_t physical_address, uint64_t flags) {
+	map_page(kernel_map, virtual_address, physical_address, flags);
+}
+
+void virtualmemory::set_current_pagemap(uint64_t pagemap) {
 	current_map = pagemap;
 	asm volatile("mov %0, %%cr3" ::"r"((uint64_t)pagemap) : "memory");
 }

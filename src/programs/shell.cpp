@@ -209,18 +209,111 @@ char keycode_to_char(uint8_t keycode) {
 	return '\0';
 }
 
+template <typename T, uint64_t size> class RingBuffer {
+public:
+	void add(T item) { data[write_cursor++] = item; };
+
+	T *get() {
+		if (read_cursor == write_cursor) {
+			return nullptr;
+		}
+		T *item = data + (read_cursor++);
+		read_cursor %= capacity;
+		return item;
+	}
+
+	T *operator[](uint64_t index) {
+		if (index < 0 || index >= capacity) {
+			return nullptr;
+		}
+		return data[index];
+	}
+
+private:
+	T data[size] = {0};
+	uint64_t capacity = size;
+	uint64_t read_cursor = 0;
+	uint64_t write_cursor = 0;
+};
+
+template <typename T, uint64_t size> class Array {
+public:
+	T &operator[](uint64_t index) { return data[index]; }
+
+private:
+	T data[size];
+	uint64_t capacity = size;
+	uint64_t length = 0;
+};
+
+template <typename T, uint64_t size> class GapBuffer {
+public:
+	bool insert(T item) {
+		if (gap_start == gap_end) {
+			return false;
+		}
+		data[gap_start++] = item;
+		return true;
+	};
+
+	Array<T, size> flatten() {
+		Array<T, size> array;
+		uint64_t index = 0;
+		for (uint64_t i = 0; i < gap_start; i++) {
+			array[index++] = data[i];
+		}
+		for (uint64_t i = gap_end; i < capacity; i++) {
+			array[index++] = data[i];
+		}
+		return array;
+	};
+
+	// limit to min index 0
+	bool move_left() {
+		if (gap_start == 0) {
+			return false;
+		}
+		data[gap_end - 1] = data[gap_start - 1];
+		data[gap_start - 1] = 0;
+		gap_start -= 1;
+		gap_end -= 1;
+		return true;
+	}
+
+	// limit to only used bytes
+	bool move_right() {
+		if (gap_start == size) {
+			return false;
+		}
+		data[gap_start] = data[gap_end];
+		data[gap_end] = 0;
+		gap_start += 1;
+		gap_end += 1;
+		return true;
+	}
+
+	void reset() {
+		gap_start = 0;
+		gap_end = size;
+	}
+
+private:
+	T data[size] = {0};
+	uint64_t capacity = size;
+	uint64_t gap_start = 0;
+	uint64_t gap_end = size;
+};
+
+RingBuffer<uint8_t, 256> keycodes;
+bool upper_case = false;
+GapBuffer<char, 78> line_buffer;
+
 void print_command_start() {
 	printf("> ");
 }
 
 void key_released(uint8_t keycode) {
-	if (is_printable(keycode)) {
-		char c = keycode_to_char(keycode);
-		put_char(c);
-		if (c == '\n') {
-			print_command_start();
-		}
-	}
+	keycodes.add(keycode);
 }
 
 void init_shell() {
@@ -229,4 +322,41 @@ void init_shell() {
 	print_command_start();
 }
 
-void shell_loop() {}
+uint64_t count = 0;
+uint64_t max_count = 99999999;
+
+void shell_loop() {
+	uint8_t *keycode_ptr = keycodes.get();
+	if (keycode_ptr != nullptr) {
+		uint8_t keycode = *keycode_ptr;
+		if (is_printable(keycode)) {
+			char c = keycode_to_char(keycode);
+			put_char(c);
+			if (c == '\n') {
+				print_command_start();
+			}
+			line_buffer.insert(c);
+		} else if (keycode == key_code::arrow_left_key) {
+			if (line_buffer.move_left()) {
+				blink_cursor_off();
+				cursor_dec();
+			}
+		} else if (keycode == key_code::arrow_right_key) {
+			if (line_buffer.move_right()) {
+				blink_cursor_off();
+				cursor_inc();
+			}
+		}
+		count = (max_count / 2);
+	} else {
+		if (count == (max_count / 2)) {
+			blink_cursor_on();
+		} else if (count == 0) {
+			blink_cursor_off();
+		}
+		count++;
+		if (count > max_count) {
+			count = 0;
+		}
+	}
+}

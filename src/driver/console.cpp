@@ -13,6 +13,7 @@ uint64_t rows = 0;
 Point cursor = {0, 0};
 uint64_t scale = 2;
 bool uart_enabled = false;
+uint8_t history[80 * 50] = {};
 
 void init_console(uint64_t new_cols, uint64_t new_rows, uint64_t new_scale) {
 	cols = new_cols;
@@ -25,6 +26,34 @@ void clear_console() {
 	clear_screen();
 }
 
+void blink_cursor_on() {
+	uint64_t start_y = cursor.y * 8 * scale;
+	uint64_t start_x = cursor.x * 8 * scale;
+	fill_rect(0xFFFFFFFF, start_x, start_y, 8 * scale, 8 * scale);
+};
+
+void blink_cursor_off() {
+	uint64_t start_y = cursor.y * 8 * scale;
+	uint64_t start_x = cursor.x * 8 * scale;
+	clear_rect(start_x, start_y, 8 * scale, 8 * scale);
+};
+
+void cursor_inc() {
+	cursor.x++;
+	if (cursor.x == cols) {
+		cursor.x = 0;
+		if (cursor.y == rows - 1) {
+			cursor.y = 0;
+			clear_console();
+		} else {
+			cursor.y++;
+		}
+	}
+}
+void cursor_dec() {
+	cursor.x--;
+}
+
 void put_char(char character) {
 	uint64_t start_y = cursor.y * 8 * scale;
 	uint64_t start_x = cursor.x * 8 * scale;
@@ -35,7 +64,9 @@ void put_char(char character) {
 		} else {
 			cursor.y++;
 		}
-		uart_send('\r');
+		if (uart_enabled) {
+			uart_send('\r');
+		}
 	} else if (character == '\r') {
 		cursor.x = 0;
 	} else {
@@ -45,15 +76,16 @@ void put_char(char character) {
 	if (uart_enabled) {
 		uart_send(character);
 	}
-
-	cursor.x++;
-	if (cursor.x == cols) {
-		cursor.x = 0;
-		if (cursor.y == rows - 1) {
-			cursor.y = 0;
-			clear_console();
-		} else {
-			cursor.y++;
+	if (character != '\n' && character != '\r') {
+		cursor.x++;
+		if (cursor.x == cols) {
+			cursor.x = 0;
+			if (cursor.y == rows - 1) {
+				cursor.y = 0;
+				clear_console();
+			} else {
+				cursor.y++;
+			}
 		}
 	}
 }
@@ -158,4 +190,5 @@ void printf(const char *fmt, ...) {
 
 void console_set_uart_enabled() {
 	uart_enabled = true;
+	// printf("cols: %u, rows: %u", cols, rows);
 }
