@@ -51,7 +51,7 @@ interrupt_handler_common:
 
 	pop_all
 	add rsp, 16
-	sti
+;	sti
 	iretq
 
 

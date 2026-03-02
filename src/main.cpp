@@ -85,11 +85,11 @@ void iop_handler(InterruptFrame *frame) {
 	hcf();
 }
 
-uint64_t microseconds = 0;
+volatile uint64_t miliseconds = 0;
 
 void PIC_timer_handler() {
 	// printf("timer\n");
-	microseconds += 1;
+	miliseconds += 1;
 	PIC_send_EOI(0);
 }
 
@@ -143,6 +143,17 @@ void interrupt_handler(InterruptFrame *frame) {
 	}
 }
 
+void sleep(uint64_t ms) {
+
+	uint64_t start_time = miliseconds;
+
+	while ((miliseconds - start_time) < ms) {
+		asm volatile("hlt");
+	}
+
+	return;
+}
+
 extern "C" void kmain(void) {
 	if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
 		hcf();
@@ -178,8 +189,8 @@ extern "C" void kmain(void) {
 	// ps2_keyboard_get_current_keyset();
 	// ps2_flush_keycode_buffer();
 
-	init_ACPI();
-// init_shell();
+	// init_ACPI();
+	// init_shell();
 
 // Programmable interrupt timer setup
 #define PIT_CHANNEL_0 0x40

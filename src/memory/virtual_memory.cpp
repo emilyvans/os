@@ -19,6 +19,10 @@ void clear_page(PhysicalAddress physical_address) {
 	}
 }
 
+void *page_alloc(uint64_t pages) {}
+
+void *alloc(uint64_t bytes) {}
+
 void virtualmemory::initialize() {
 	limine_executable_file_response *executable_file_response =
 		executable_file_request.response;
