@@ -2,7 +2,7 @@
 - [-] keyboard support
     - only keyset 1 working for now
 - [x] basic UART support
-- [ ] heap memory
+- [x] basic memory management
 - [ ] PCI driver
     - [ ] PCI-e driver(maybe)
 - [ ] disk driver

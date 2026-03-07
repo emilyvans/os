@@ -73,4 +73,9 @@ void set_current_pagemap(uint64_t pagemap);
 void swap_to_kernel_pagemap();
 
 } // namespace virtualmemory
+
+void *page_alloc(uint64_t pages);
+void free_pages(void *start, uint64_t pages);
+// void *alloc(uint64_t bytes);
+
 #endif // INCLUDE_MEMORY_VIRTUAL_MEMORY_HPP_

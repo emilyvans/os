@@ -19,9 +19,20 @@ void clear_page(PhysicalAddress physical_address) {
 	}
 }
 
-void *page_alloc(uint64_t pages) {}
+void *page_alloc(uint64_t pages) {
+	uint64_t addr = physicalmemory::kalloc(pages);
+	if (addr == NULL) {
+		return NULL;
+	}
+	return (void *)(addr + hhdm_request.response->offset);
+}
 
-void *alloc(uint64_t bytes) {}
+void free_pages(void *start, uint64_t pages) {
+	physicalmemory::kfree(
+		(PhysicalAddress)start - hhdm_request.response->offset, pages);
+}
+
+// void *alloc(uint64_t bytes) {}
 
 void virtualmemory::initialize() {
 	limine_executable_file_response *executable_file_response =
@@ -44,10 +55,14 @@ void virtualmemory::initialize() {
 	}
 	for (uint64_t i = 0; i < memmap_response->entry_count; i++) {
 		limine_memmap_entry *entry = memmap_response->entries[i];
-		if (entry->type == LIMINE_MEMMAP_ACPI_TABLES ||
+		/*if (entry->type == LIMINE_MEMMAP_ACPI_TABLES ||
 		    entry->type == LIMINE_MEMMAP_ACPI_RECLAIMABLE ||
 		    entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
 		    entry->type == LIMINE_MEMMAP_RESERVED ||
+		    entry->type == LIMINE_MEMMAP_USABLE) {*/
+		// if (entry->type != LIMINE_MEMMAP_BAD_MEMORY) {
+		if (entry->type == LIMINE_MEMMAP_ACPI_RECLAIMABLE ||
+		    entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
 		    entry->type == LIMINE_MEMMAP_USABLE) {
 			for (uint64_t offset = 0; offset < entry->length; offset += 4096) {
 				map_page(kernel_map,
@@ -67,6 +82,12 @@ void virtualmemory::initialize() {
 		framebuffer_physical_address = entry->base;
 		framebuffer_length = entry->length;
 	}
+	/*
+	    for (uint64_t i = get_bitmap_base();
+	         i < (get_bitmap_base() + get_bitmap_byte_length()); i += 4096) {
+	        map_page(kernel_map, i, i - hhdm_response->offset,
+	                 present_flag | readwrite_flag);
+	    }*/
 
 	for (uint64_t i = 0; i < framebuffer_length; i += 4096) {
 		map_page(kernel_map,

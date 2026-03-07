@@ -37,22 +37,6 @@ __attribute__((
 __attribute__((used, section(".limine_requests_end"))) static volatile uint64_t
 	limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
-void print_entry(IDTEntry entry) {
-	clear_console();
-	printf("%x %u %b %b %x %x %u 0x%x\n", entry.address_low, entry.selector,
-	       entry.ist, entry.flags, entry.address_mid, entry.address_high,
-	       entry.reserved,
-	       ((uint64_t)entry.address_high << 32) |
-	           ((uint64_t)entry.address_mid << 16) |
-	           (uint64_t)entry.address_low);
-}
-
-void print_entry(GDTEntry entry) {
-	clear_console();
-	printf("%x %x %x %b %b %x\n", entry.Limit0, entry.Base0, entry.Base1,
-	       entry.Accessbyte, entry.Limit1_Flags, entry.Base2);
-}
-
 void pf_handler(InterruptFrame *frame) {
 	uint64_t fault_address;
 
@@ -73,7 +57,8 @@ void double_fault_handler(InterruptFrame *frame) {
 void gp_handler(InterruptFrame *frame) {
 	(void)frame; // to remove warning
 	// clear_console();
-	printf("general protation\n");
+	printf("general protation\nRIP=%x CS=%x RFLAGS=%x\nerror=%b\n", frame->rip,
+	       frame->cs, frame->flags, frame->error_code);
 	hcf();
 }
 void iop_handler(InterruptFrame *frame) {
@@ -183,8 +168,9 @@ extern "C" void kmain(void) {
 	physicalmemory::initialize();
 	virtualmemory::initialize();
 
-	printf("free memory: %u/%u\n", physicalmemory::get_free_ram(),
-	       physicalmemory::get_total_ram());
+	printf("total Memory: %uMiB\nfree memory:  %uMiB\n",
+	       physicalmemory::get_total_ram() / 1024 / 1024,
+	       physicalmemory::get_free_ram() / 1024 / 1024);
 
 	// ps2_keyboard_get_current_keyset();
 	// ps2_flush_keycode_buffer();
@@ -206,10 +192,18 @@ extern "C" void kmain(void) {
 	outb(PIT_CHANNEL_0, (freq_divider & 0xFF00) >> 8);
 
 	PIC_unmask_interrupt(0);
-	// convert this to a non busy-loop
+	// while (miliseconds < 10000) {
+	// };
+	//  convert this to a non busy-loop
 	for (;;) {
-		// ps2_handler();
-		// shell_loop();
-		asm volatile("hlt");
+		// void *mem = page_alloc(255);
+		// printf("total Memory: %uMiB\nfree memory:  %uMiB\n",
+		//        physicalmemory::get_total_ram() / 1024 / 1024,
+		//        physicalmemory::get_free_ram() / 1024 / 1024);
+		//  ps2_handler();
+		//  shell_loop();
+		for (uint16_t i = 0; i < 10; i++) {
+			asm volatile("hlt");
+		}
 	}
 }
