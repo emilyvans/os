@@ -172,12 +172,11 @@ extern "C" void kmain(void) {
 	       physicalmemory::get_total_ram() / 1024 / 1024,
 	       physicalmemory::get_free_ram() / 1024 / 1024);
 
-	// ps2_keyboard_get_current_keyset();
-	// ps2_flush_keycode_buffer();
+// ps2_keyboard_get_current_keyset();
+// ps2_flush_keycode_buffer();
+	init_ACPI();
 
-	// init_ACPI();
 	// init_shell();
-
 // Programmable interrupt timer setup
 #define PIT_CHANNEL_0 0x40
 #define PIT_CHANNEL_1 0x41

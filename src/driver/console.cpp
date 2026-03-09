@@ -58,6 +58,10 @@ void put_char(char character) {
 	uint64_t start_y = cursor.y * 8 * scale;
 	uint64_t start_x = cursor.x * 8 * scale;
 	if (character == '\n') {
+		for (uint32_t i = cursor.x; i < cols; i++) {
+			uint64_t start_x = i * 8 * scale;
+			draw_char(' ', start_y, start_x, 0xFFFFFF, scale);
+		}
 		cursor.x = 0;
 		if (cursor.y == rows - 1) {
 			cursor.y = 0;
