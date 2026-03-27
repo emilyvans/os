@@ -9,7 +9,7 @@ set(COMMON_FLAGS -Wall -Wextra -ffreestanding -fno-stack-protector -fno-stack-ch
 
 project(myos CXX ASM_NASM)
 
-set(SOURCES 
+set(SOURCES
 	./src/cpu/GDT.asm
 	./src/cpu/interrupts.asm
 	./src/main.cpp
@@ -39,20 +39,20 @@ target_include_directories(myos PRIVATE external/limine-protocol/include/)
 
 target_compile_options(myos PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${COMMON_FLAGS}>)
 
-# add custom command for a raw disk file with fully installed limine for better incremental builds 
+# add custom command for a raw disk file with fully installed limine for better incremental builds
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND ${CMAKE_COMMAND} -E rm -f -- ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND dd if=/dev/null bs=1M count=0 seek=512 of=${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND sgdisk ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd -n 1:2048 -t 1:ef00 -m 1
 	COMMAND make -C ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine
-	COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine bios-install 
+	COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine bios-install
 		${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND mformat -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
 	COMMAND mmd -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine
-	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M 
-		${CMAKE_CURRENT_SOURCE_DIR}/limine.conf 
-		${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine-bios.sys 
+	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
+		${CMAKE_CURRENT_SOURCE_DIR}/limine.conf
+		${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine-bios.sys
 		::/boot/limine
 	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
 		${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/BOOTIA32.EFI
@@ -60,9 +60,9 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
 		${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/BOOTX64.EFI
 		::/EFI/BOOT
-	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/limine.conf 
-			${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine.c 
-			${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine-bios.sys 
+	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/limine.conf
+			${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine.c
+			${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine-bios.sys
 			${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/BOOTIA32.EFI
 			${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/BOOTX64.EFI
 	COMMENT making limine_drive.hdd

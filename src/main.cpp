@@ -174,7 +174,17 @@ extern "C" void kmain(void) {
 
 // ps2_keyboard_get_current_keyset();
 // ps2_flush_keycode_buffer();
+#if 1
 	init_ACPI();
+#else
+	for (uint8_t i = 0; i < 32; i++) {
+		uint32_t vender_device_id = pci_config_read(0, i, 0, 0);
+		if ((vender_device_id & 0xFFFF) != 0xFFFF) {
+			printf("%u: vendor: %x, device: %x\n", i, vender_device_id & 0xFFFF,
+			       (vender_device_id & 0xFFFF0000) >> 16);
+		}
+	}
+#endif
 
 	// init_shell();
 // Programmable interrupt timer setup
