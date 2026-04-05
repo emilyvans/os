@@ -3,6 +3,7 @@
 #include "cpu/interrupts.hpp"
 #include "driver/acpi.hpp"
 #include "driver/console.hpp"
+#include "driver/device.hpp"
 #include "driver/init.hpp"
 #include "driver/keyboard/keyboard.hpp"
 #include "driver/pic.hpp"
@@ -138,6 +139,8 @@ void sleep(uint64_t ms) {
 
 	return;
 }
+
+void register_bus(bus_type *bus);
 
 extern "C" void kmain(void) {
 	if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {

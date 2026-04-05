@@ -30,6 +30,7 @@ set(SOURCES
 	./src/cpu/spinlock.cpp
 	./src/driver/uart.cpp
 	./src/programs/shell.cpp
+	./src/driver/device.cpp
 )
 
 add_executable(myos ${SOURCES})
