@@ -2,11 +2,10 @@
 #include "driver/console.hpp"
 #include "limine/limine_requests.hpp"
 #include "memory/physical_memory.hpp"
-#include "panic.hpp"
+#include "utils.hpp"
 #include <limine.h>
 #include <stdint.h>
 
-void print(uint64_t original_number, uint64_t base);
 uint64_t kernel_map = 0;
 uint64_t current_map = 0;
 
@@ -32,7 +31,61 @@ void free_pages(void *start, uint64_t pages) {
 		(PhysicalAddress)start - hhdm_request.response->offset, pages);
 }
 
-// void *alloc(uint64_t bytes) {}
+typedef struct FreeList {
+	FreeList *next;
+} FreeList;
+
+typedef struct Slab {
+	uintptr_t address;
+	uint64_t total_count;
+	uint64_t free_count;
+	FreeList *free_list;
+	Slab *next;
+	struct Cache *parent;
+} Slab;
+
+typedef struct Cache {
+	uint64_t object_size;
+	Slab *full_slabs;
+	Slab *partial_slabs;
+	Slab *free_slabs;
+} Cache;
+
+typedef struct Allocation {
+	uint8_t type; // 0 for page, 1 for slab
+	uint64_t size;
+} Allocation;
+
+Allocation *items;
+uint64_t capacity;
+uint64_t size;
+
+void kalloc_init(uint64_t total_ram) {
+	// capacity = total_ram in bytes/4096*sizeof(Allocation)
+	// index =
+}
+
+void *kalloc(uint64_t bytes) {
+	// TODO: use allocation array for size and type
+	// use slab alloc for size <= 2048
+	// use page alloc for size > 2048
+	return nullptr;
+}
+
+void kfree(void *ptr) {
+	// TODO:use the allocation array to find type and size of the allocation
+}
+
+void *kzalloc(uint64_t bytes) {
+	void *start = kalloc(bytes);
+	if (start == nullptr) {
+		return nullptr;
+	}
+
+	memset(start, 0, bytes);
+
+	return start;
+}
 
 void virtualmemory::initialize() {
 	limine_executable_file_response *executable_file_response =

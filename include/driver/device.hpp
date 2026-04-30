@@ -1,43 +1,42 @@
 #ifndef INCLUDE_DRIVER_DEVICE_HPP_
 #define INCLUDE_DRIVER_DEVICE_HPP_
 
+#include "list/klist.hpp"
 #include <stdint.h>
 
-typedef struct klist_head {
-	struct klist_head *next, *prev;
-	void *owner;
-} klist_head;
+typedef struct Device {
+	struct KListHead list_global;
+	struct KListHead list_bus;
+	struct KListHead list_driver;
+	struct Driver *active_driver = nullptr;
+	struct BusType *bus = nullptr;
+} Device;
 
-#define KLIST_FOREACH(list_head)                                               \
-	for (klist_head *head = (list_head)->next; head != (list_head);            \
-	     head = head->next)
-
-typedef struct device_t {
-	struct klist_head list_global;
-	struct klist_head list_siblings;
-	struct driver_t *active_driver;
-	struct bus_type *bus;
-} device_t;
-
-typedef struct driver_t {
-	struct klist_head list_global;
-	struct klist_head list_siblings;
-	int (*probe)(device_t *device, driver_t *driver);
-	int (*match)(device_t *device, driver_t *driver);
-
-} driver_t;
-
-typedef struct bus_type {
+typedef struct Driver {
 	const char *name;
-	struct klist_head driver_list;
-	struct klist_head device_list;
-	struct klist_head bus_list;
-	int (*probe)(device_t *device, driver_t *driver);
-	int (*match)(device_t *device, driver_t *driver);
-} bus_type;
+	struct KListHead list_global;
+	struct KListHead list_bus;
+	struct KListHead device_list;
+	int (*probe)(Device *device);
+} Driver;
 
-extern klist_head bus_list;
-extern klist_head device_list;
-extern klist_head driver_list;
+typedef struct BusType {
+	const char *name;
+	struct KListHead driver_list;
+	struct KListHead device_list;
+	struct KListHead bus_list;
+	int (*probe)(Device *device);
+	int (*match)(Device *device, Driver *driver);
+} BusType;
+
+extern KListHead bus_list;
+extern KListHead device_list;
+extern KListHead driver_list;
+
+void register_bus(BusType *bus);
+void register_driver(Driver *driver, BusType *bus);
+void register_device(Device *device, BusType *bus);
+void unregister_driver(Driver *driver, BusType *bus);
+void unregister_device(Device *device, BusType *bus);
 
 #endif // INCLUDE_DRIVER_DEVICE_HPP_

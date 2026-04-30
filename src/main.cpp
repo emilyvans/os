@@ -6,9 +6,11 @@
 #include "driver/device.hpp"
 #include "driver/init.hpp"
 #include "driver/keyboard/keyboard.hpp"
+#include "driver/pci.hpp"
 #include "driver/pic.hpp"
 #include "driver/uart.hpp"
 #include "limine/limine_requests.hpp"
+#include "list/container_of.hpp"
 #include "memory/physical_memory.hpp"
 #include "memory/virtual_memory.hpp"
 #include "panic.hpp"
@@ -140,7 +142,10 @@ void sleep(uint64_t ms) {
 	return;
 }
 
-void register_bus(bus_type *bus);
+/// temp
+int VIRTIO_PROBE(PCIDevice *pci_dev);
+int VIRTIO_MATCH(Device *dev, Driver *drv);
+/// end temp
 
 extern "C" void kmain(void) {
 	if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
@@ -206,6 +211,21 @@ extern "C" void kmain(void) {
 	PIC_unmask_interrupt(0);
 	// while (miliseconds < 10000) {
 	// };
+
+	clear_console();
+	PCIDeviceID ids[] = {
+		{.vendor_id = 0x1AF4, .device_id = PCI_ANY_ID /*0x1001*/}, {0}};
+	PCIDevice *dev = &virtio_blk;
+	PCIDriver virtio_drv = {
+		.probe = &VIRTIO_PROBE,
+		.name = "VIRTIO",
+		.id_table = ids,
+	};
+
+	register_bus(&pci_bus);
+	register_pci_device(dev);
+	register_pci_driver(&virtio_drv);
+
 	//  convert this to a non busy-loop
 	for (;;) {
 		// void *mem = page_alloc(255);
@@ -218,4 +238,10 @@ extern "C" void kmain(void) {
 			asm volatile("hlt");
 		}
 	}
+}
+int VIRTIO_PROBE(PCIDevice *pci_dev) {
+	printf("virtio probe\n");
+	printf("bus: %s, addr: %x\n", pci_dev->device.bus->name,
+	       pci_dev->config_address);
+	return 1;
 }

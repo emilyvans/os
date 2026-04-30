@@ -18,9 +18,4 @@ extern "C" void *memmove(void *dest, const void *src, size_t count);
 
 extern "C" int memcmp(const void *address1, const void *address2, size_t count);
 
-void print(const char *fmt);
-
-void print(const char *fmt, uint64_t count);
-
-void print(uint64_t original_number, uint64_t base);
 #endif // INCLUDE_UTILS_HPP_

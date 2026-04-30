@@ -1,6 +1,7 @@
 #include "driver/acpi.hpp"
 #include "driver/console.hpp"
 #include "driver/keyboard/keycode.hpp"
+#include "driver/pci.hpp"
 #include "driver/screen.hpp"
 #include "limine/limine_requests.hpp"
 #include "memory/physical_memory.hpp"
@@ -370,6 +371,8 @@ typedef struct virtio_blk_config {
 	} zoned;
 } __attribute__((packed)) virtio_blk_config;
 
+PCIDevice virtio_blk;
+
 void parse_MCFG(ACPISDTHeader *header) {
 	printf("entries: %u\n", ((header->Length - 8 - sizeof(ACPISDTHeader)) /
 	                         sizeof(MCFG_allocation)));
@@ -401,8 +404,16 @@ void parse_MCFG(ACPISDTHeader *header) {
 			if (pci_device->Vendor_ID == 0x1AF4 &&
 			    pci_device->device_ID == 0x1001) {
 				virtio_block_device = pci_device;
+				virtio_blk.bus = bus;
+				virtio_blk.device_number = dev;
+				virtio_blk.function = 0;
+				virtio_blk.device_id = pci_device->device_ID;
+				virtio_blk.vendor_id = pci_device->Vendor_ID;
+				virtio_blk.class_code = pci_device->class_code;
+				virtio_blk.subclass = pci_device->subclass;
+				virtio_blk.config_address = (uint64_t)pci_device;
 			}
-			print_pci_device(pci_device);
+			// print_pci_device(pci_device);
 			if (pci_device->header_type & 0x80) {
 				for (uint8_t i = 1; i < 8; i++) {
 					volatile pci_header *pci_device =
@@ -413,8 +424,14 @@ void parse_MCFG(ACPISDTHeader *header) {
 					if (pci_device->Vendor_ID == 0xFFFF) {
 						continue;
 					}
-					print_pci_device(pci_device, i);
+					// TODO: create pci device and register it
+					// register_pci_device(PCIDevice *device)
+
+					//  print_pci_device(pci_device, i);
 				}
+			} else {
+				// TODO: create pci device and register it
+				// register_pci_device(PCIDevice *device)
 			}
 		}
 	}
@@ -423,6 +440,7 @@ void parse_MCFG(ACPISDTHeader *header) {
 		printf("virtio block device not found\n");
 		return;
 	}
+	return;
 	print_pci_device(virtio_block_device);
 	printf("------------------------------------\n");
 	pci_capability *capability =
@@ -449,7 +467,8 @@ void parse_MCFG(ACPISDTHeader *header) {
 			BarAddress addr = get_address_from_bar(virtio_block_device,
 			                                       virtio_capability->bar);
 
-			printf("addr: %x, type: %s\n", addr.address,
+			printf("addr: %x, type: %s\n",
+			       addr.address + virtio_capability->offset,
 			       addr.is_memory_space ? "memory" : "I/O");
 
 			if (addr.is_memory_space) {

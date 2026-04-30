@@ -15,6 +15,8 @@ extern "C" void *memcpy(void *__restrict dest, const void *__restrict src,
 extern "C" void *memset(void *address, int number, size_t count) {
 	uint8_t *p = (uint8_t *)address;
 
+	// TODO: maybe optimize to write 64-bit value when posible
+
 	for (size_t i = 0; i < count; i++) {
 		p[i] = (uint8_t)number;
 	}

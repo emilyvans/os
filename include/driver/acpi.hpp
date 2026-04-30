@@ -1,5 +1,6 @@
 #ifndef INCLUDE_DRIVER_ACPI_HPP_
 #define INCLUDE_DRIVER_ACPI_HPP_
+#include "driver/pci.hpp"
 #include <stdint.h>
 
 struct GenericAddressStructure {
@@ -158,5 +159,7 @@ struct BitmapHeader {
 
 void init_ACPI();
 void display_BGRT(BGRT *bgrt);
+
+extern PCIDevice virtio_blk;
 
 #endif // INCLUDE_DRIVER_ACPI_HPP_

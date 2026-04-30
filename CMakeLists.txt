@@ -31,6 +31,8 @@ set(SOURCES
 	./src/driver/uart.cpp
 	./src/programs/shell.cpp
 	./src/driver/device.cpp
+	./src/driver/pci.cpp
+	./src/list/klist.cpp
 )
 
 add_executable(myos ${SOURCES})
