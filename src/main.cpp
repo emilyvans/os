@@ -183,6 +183,7 @@ extern "C" void kmain(void) {
 // ps2_keyboard_get_current_keyset();
 // ps2_flush_keycode_buffer();
 #if 1
+	register_bus(&pci_bus);
 	init_ACPI();
 #else
 	for (uint8_t i = 0; i < 32; i++) {
@@ -221,10 +222,11 @@ extern "C" void kmain(void) {
 		.name = "VIRTIO",
 		.id_table = ids,
 	};
-
-	register_bus(&pci_bus);
-	register_pci_device(dev);
+	// register_pci_device(dev);
 	register_pci_driver(&virtio_drv);
+	printf("total Memory: %uMiB\nfree memory:  %uMiB\n",
+	       physicalmemory::get_total_ram() / 1024 / 1024,
+	       physicalmemory::get_free_ram() / 1024 / 1024);
 
 	//  convert this to a non busy-loop
 	for (;;) {
@@ -241,7 +243,7 @@ extern "C" void kmain(void) {
 }
 int VIRTIO_PROBE(PCIDevice *pci_dev) {
 	printf("virtio probe\n");
-	printf("bus: %s, addr: %x\n", pci_dev->device.bus->name,
-	       pci_dev->config_address);
+	printf("bus: %s, devid: 0x%x, addr: %x\n", pci_dev->device.bus->name,
+	       pci_dev->device_id, pci_dev->config_address);
 	return 1;
 }

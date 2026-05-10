@@ -16,10 +16,6 @@ void register_driver(Driver *driver, BusType *bus) {
 	klist_add_tail(&driver_list, &driver->list_global);
 	klist_add_tail(&bus->driver_list, &driver->list_bus);
 	klist_init(&driver->device_list);
-	for (Device *dev = container_of(bus->device_list.next, Device, list_bus);
-	     &dev->list_bus != &bus->device_list;
-	     dev = container_of(dev->list_bus.next, Device, list_bus)) {
-	}
 	KLIST_FOREACH(&bus->device_list) {
 		Device *device = container_of(head, Device, list_bus);
 		if (device->active_driver != nullptr) {

@@ -1,6 +1,8 @@
 #include "memory/virtual_memory.hpp"
 #include "driver/console.hpp"
 #include "limine/limine_requests.hpp"
+#include "list/container_of.hpp"
+#include "list/klist.hpp"
 #include "memory/physical_memory.hpp"
 #include "utils.hpp"
 #include <limine.h>
@@ -36,19 +38,20 @@ typedef struct FreeList {
 } FreeList;
 
 typedef struct Slab {
-	uintptr_t address;
+	uintptr_t first_object_address;
 	uint64_t total_count;
 	uint64_t free_count;
+	uint64_t object_size;
 	FreeList *free_list;
-	Slab *next;
+	KListHead list;
 	struct Cache *parent;
 } Slab;
 
 typedef struct Cache {
 	uint64_t object_size;
-	Slab *full_slabs;
-	Slab *partial_slabs;
-	Slab *free_slabs;
+	KListHead full_slabs;
+	KListHead partial_slabs;
+	KListHead free_slabs;
 } Cache;
 
 typedef struct Allocation {
@@ -60,20 +63,101 @@ Allocation *items;
 uint64_t capacity;
 uint64_t size;
 
-void kalloc_init(uint64_t total_ram) {
-	// capacity = total_ram in bytes/4096*sizeof(Allocation)
-	// index =
+#define SLAB_PAGES 4
+uint64_t slab_availible_space = ((SLAB_PAGES * 4096) - sizeof(Slab));
+
+Slab *alloc_slab(uint64_t obj_size) {
+	void *pages = page_alloc(SLAB_PAGES);
+	uint64_t object_offset = slab_availible_space % obj_size;
+	uint64_t object_count = slab_availible_space / obj_size;
+	Slab *slab = (Slab *)pages;
+
+	slab->object_size = obj_size;
+	slab->free_count = slab->total_count = object_count;
+	klist_init(&slab->list);
+
+	slab->first_object_address =
+		(uintptr_t)pages + sizeof(Slab) + object_offset;
+	FreeList *prev_free_list = (FreeList *)slab->first_object_address;
+
+	slab->free_list = prev_free_list;
+	for (uint64_t i = 1; i < object_count; i++) {
+		FreeList *free_list =
+			(FreeList *)((uintptr_t)prev_free_list + obj_size);
+		prev_free_list->next = free_list;
+		prev_free_list = free_list;
+	}
+
+	return slab;
+}
+
+void free_slab(Slab *slab) {
+	free_pages(slab, SLAB_PAGES);
+}
+
+// 8 16 32 64 128 256 512 1024 2048
+#define KMEM_CACHE_COUNT 9
+Cache kmem_cache[KMEM_CACHE_COUNT];
+uint64_t kmem_cache_sizes[KMEM_CACHE_COUNT] = {8,   16,  32,   64,  128,
+                                               256, 512, 1024, 2048};
+
+void kalloc_init() {
+	for (uint64_t i = 0; i < KMEM_CACHE_COUNT; i++) {
+		Cache *cache = &kmem_cache[i];
+		cache->object_size = kmem_cache_sizes[i];
+		klist_init(&cache->free_slabs);
+		klist_init(&cache->partial_slabs);
+		klist_init(&cache->full_slabs);
+	}
 }
 
 void *kalloc(uint64_t bytes) {
-	// TODO: use allocation array for size and type
-	// use slab alloc for size <= 2048
-	// use page alloc for size > 2048
+	Cache *selected_cache = nullptr;
+	for (uint64_t i = 0; i < KMEM_CACHE_COUNT; i++) {
+		Cache *cache = &kmem_cache[i];
+		if (cache->object_size < bytes)
+			continue;
+		selected_cache = cache;
+		break;
+	}
+	if (selected_cache == nullptr)
+		return nullptr;
+
+	if (!klist_is_empty(&selected_cache->partial_slabs)) {
+		Slab *slab =
+			container_of(selected_cache->partial_slabs.next, Slab, list);
+		FreeList *free_list = slab->free_list;
+		slab->free_list = free_list->next;
+		slab->free_count -= 1;
+		if (slab->free_count == 0) {
+			KListHead *list_head =
+				klist_pop_head(&selected_cache->partial_slabs);
+			klist_add_tail(&selected_cache->full_slabs, list_head);
+		}
+		return free_list;
+	} else if (!klist_is_empty(&selected_cache->free_slabs)) {
+		Slab *slab = container_of(selected_cache->free_slabs.next, Slab, list);
+		FreeList *free_list = slab->free_list;
+		slab->free_list = free_list->next;
+		slab->free_count -= 1;
+		KListHead *list_head = klist_pop_head(&selected_cache->free_slabs);
+		klist_add_tail(&selected_cache->partial_slabs, list_head);
+		return free_list;
+	} else {
+		Slab *slab = alloc_slab(selected_cache->object_size);
+		slab->parent = selected_cache;
+		FreeList *free_list = slab->free_list;
+		slab->free_list = free_list->next;
+		slab->free_count -= 1;
+		klist_add_tail(&selected_cache->partial_slabs, &slab->list);
+		return free_list;
+	}
+
 	return nullptr;
 }
 
 void kfree(void *ptr) {
-	// TODO:use the allocation array to find type and size of the allocation
+	Slab *slab = (Slab *)((uintptr_t)ptr & ~((4096 * SLAB_PAGES) - 1));
 }
 
 void *kzalloc(uint64_t bytes) {
@@ -150,6 +234,7 @@ void virtualmemory::initialize() {
 	}
 
 	swap_to_kernel_pagemap();
+	kalloc_init();
 }
 
 // P = address in the page

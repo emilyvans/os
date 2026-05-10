@@ -33,10 +33,12 @@ int PCI_MATCH(Device *dev, Driver *drv) {
 		while (!is_list_terminator(*id_list)) {
 			if (!(pci_dev->vendor_id == id_list->vendor_id ||
 			      id_list->vendor_id == PCI_ANY_ID)) {
+				id_list = id_list + 1;
 				continue;
 			}
 			if (!(pci_dev->device_id == id_list->device_id ||
 			      id_list->device_id == PCI_ANY_ID)) {
+				id_list = id_list + 1;
 				continue;
 			}
 			return 0;

@@ -401,6 +401,16 @@ void parse_MCFG(ACPISDTHeader *header) {
 			                    ((uint64_t(0) & 0x7) << 12)));
 			if (pci_device->Vendor_ID == 0xFFFF /*|| t->class_code == 0*/)
 				continue;
+			PCIDevice *device = (PCIDevice *)kalloc(sizeof(PCIDevice));
+			device->bus = bus;
+			device->device_number = dev;
+			device->function = 0;
+			device->device_id = pci_device->device_ID;
+			device->vendor_id = pci_device->Vendor_ID;
+			device->class_code = pci_device->class_code;
+			device->subclass = pci_device->subclass;
+			device->config_address = (uint64_t)pci_device;
+			register_pci_device(device);
 			if (pci_device->Vendor_ID == 0x1AF4 &&
 			    pci_device->device_ID == 0x1001) {
 				virtio_block_device = pci_device;
