@@ -15,7 +15,7 @@ void clear_page(PhysicalAddress physical_address) {
 	uint64_t address = physical_address + hhdm_request.response->offset;
 	for (uint64_t i = address; i < address + 4096; i += 8) {
 		uint64_t *addr = (uint64_t *)i;
-		*addr = 0;
+		*addr = 0x0;
 		(void)addr;
 	}
 }
@@ -197,10 +197,11 @@ void virtualmemory::initialize() {
 		    entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
 		    entry->type == LIMINE_MEMMAP_RESERVED ||
 		    entry->type == LIMINE_MEMMAP_USABLE) {*/
-		// if (entry->type != LIMINE_MEMMAP_BAD_MEMORY) {
-		if (entry->type == LIMINE_MEMMAP_ACPI_RECLAIMABLE ||
-		    entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
-		    entry->type == LIMINE_MEMMAP_USABLE) {
+		if (entry->type != LIMINE_MEMMAP_BAD_MEMORY) {
+			/*if (entry->type == LIMINE_MEMMAP_ACPI_TABLES ||
+			    entry->type == LIMINE_MEMMAP_ACPI_RECLAIMABLE ||
+			    entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE ||
+			    entry->type == LIMINE_MEMMAP_USABLE) {*/
 			for (uint64_t offset = 0; offset < entry->length; offset += 4096) {
 				map_page(kernel_map,
 				         hhdm_response->offset + entry->base + offset,

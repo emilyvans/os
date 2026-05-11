@@ -160,6 +160,4 @@ struct BitmapHeader {
 void init_ACPI();
 void display_BGRT(BGRT *bgrt);
 
-extern PCIDevice virtio_blk;
-
 #endif // INCLUDE_DRIVER_ACPI_HPP_

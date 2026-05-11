@@ -139,8 +139,9 @@ void physicalmemory::initialize() {
 
 	for (uint64_t i = 0; i < memory_region_count; i++) {
 		MemoryRegion *region = memory_regions + i;
-		if (region->start <= (uint64_t)memory_regions &&
-		    (region->start + (region->bitmap.get_length() * 4096)) >
+		uint64_t start = region->start + hhdm_response->offset;
+		if (start <= (uint64_t)memory_regions &&
+		    (start + (region->bitmap.get_length() * 4096)) >
 		        (uint64_t)memory_regions) {
 			uint64_t pages = total_size / 4096;
 			uint64_t start = region->bitmap.get_length() - pages;
@@ -167,7 +168,7 @@ PhysicalAddress physicalmemory::kalloc(uint64_t pages) {
 				count++;
 				if (count == pages) {
 					for (uint64_t index = count; index > 0; index--) {
-						region->bitmap.set(j + index - 1);
+						region->bitmap.set(j - index + 1);
 					}
 					// printf("alloc: 0x%x, size: 0x%x\n",
 					//        region->start + ((j - count + 1) * 4096),
@@ -179,21 +180,6 @@ PhysicalAddress physicalmemory::kalloc(uint64_t pages) {
 			}
 		}
 	}
-	/*
-	    for (uint64_t i = lowest_usable_page; i < bitmap.get_length(); i++) {
-	        if (!bitmap[i]) {
-	            count++;
-	            if (count == pages) {
-	                for (uint64_t j = 0; j < count; j++) {
-	                    bitmap.set(i + j);
-	                }
-	                free_mem -= count * 4096;
-	                return i * 4096;
-	            }
-	        } else {
-	            count = 0;
-	        }
-	    }*/
 
 	return NULL;
 }

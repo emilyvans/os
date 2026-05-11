@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(COMMON_FLAGS -Wall -Wextra -ffreestanding -fno-stack-protector -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -m64 -march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -mcmodel=kernel -Wno-c99-designator)
+set(COMMON_FLAGS -Wall -Wextra -ffreestanding -fno-stack-protector -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -m64 -march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -mcmodel=kernel -Wno-c99-designator -g3)
 
 project(myos CXX ASM_NASM)
 
@@ -33,6 +33,7 @@ set(SOURCES
 	./src/driver/device.cpp
 	./src/driver/pci.cpp
 	./src/list/klist.cpp
+	./src/driver/virtio_blk.cpp
 )
 
 add_executable(myos ${SOURCES})

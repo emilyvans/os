@@ -9,6 +9,7 @@
 #include "driver/pci.hpp"
 #include "driver/pic.hpp"
 #include "driver/uart.hpp"
+#include "driver/virtio_blk.hpp"
 #include "limine/limine_requests.hpp"
 #include "list/container_of.hpp"
 #include "memory/physical_memory.hpp"
@@ -214,16 +215,15 @@ extern "C" void kmain(void) {
 	// };
 
 	clear_console();
-	PCIDeviceID ids[] = {
-		{.vendor_id = 0x1AF4, .device_id = PCI_ANY_ID /*0x1001*/}, {0}};
-	PCIDevice *dev = &virtio_blk;
+	/*PCIDeviceID ids[] = {
+	    {.vendor_id = 0x1AF4, .device_id = PCI_ANY_ID}, {0}};
 	PCIDriver virtio_drv = {
-		.probe = &VIRTIO_PROBE,
-		.name = "VIRTIO",
-		.id_table = ids,
-	};
+	    .probe = &VIRTIO_PROBE,
+	    .name = "VIRTIO",
+	    .id_table = ids,
+	};*/
 	// register_pci_device(dev);
-	register_pci_driver(&virtio_drv);
+	register_pci_driver(&virtio_blk_drv);
 	printf("total Memory: %uMiB\nfree memory:  %uMiB\n",
 	       physicalmemory::get_total_ram() / 1024 / 1024,
 	       physicalmemory::get_free_ram() / 1024 / 1024);
