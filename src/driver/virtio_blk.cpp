@@ -112,12 +112,16 @@ int virtio_blk_probe(PCIDevice *device) {
 					       blk_cfg->geometry.heads, blk_cfg->geometry.sectors);
 				} else if (virtio_capability->config_type ==
 				           VIRTIO_PCI_CAP_COMMON_CFG) {
-					uint32_t *blk_cfg =
-						(uint32_t *)(addr.address +
-					                 hhdm_request.response->offset +
-					                 virtio_capability->offset);
-
-					printf("feaures: %b\n", (uint64_t)blk_cfg[1]);
+					virtio_pci_common_cfg *cfg =
+						(virtio_pci_common_cfg
+					         *)(addr.address + hhdm_request.response->offset +
+					            virtio_capability->offset);
+					printf("dev_feaures_select: %b\n",
+					       (uint64_t)cfg->device_feature_select);
+					printf("dev_feaures: %b\n", (uint16_t)cfg->device_feature);
+					printf("drv_feaures_select: %b\n",
+					       (uint64_t)cfg->driver_feature_select);
+					printf("drv_feaures: %b\n", (uint16_t)cfg->driver_feature);
 				}
 			}
 		} else {

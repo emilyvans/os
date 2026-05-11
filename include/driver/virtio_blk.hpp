@@ -64,4 +64,25 @@ typedef struct virtio_blk_config {
 	} zoned;
 } __attribute__((packed)) virtio_blk_config;
 
+typedef struct virtio_pci_common_cfg {
+	uint32_t device_feature_select;
+	uint32_t device_feature;
+	uint32_t driver_feature_select;
+	uint32_t driver_feature;
+	uint16_t config_msix_vector;
+	uint16_t num_queues;
+	uint8_t device_status;
+	uint8_t config_generation;
+	uint16_t queue_select;
+	uint16_t queue_size;
+	uint16_t queue_msix_vector;
+	uint16_t queue_enable;
+	uint16_t queue_notify_off;
+	uint64_t queue_desc;
+	uint64_t queue_driver;
+	uint64_t queue_device;
+	uint16_t queue_notify_data;
+	uint16_t queue_reset;
+} __attribute__((packed)) virtio_pci_common_cfg;
+
 #endif // INCLUDE_DRIVER_VIRTIO_BLK_HPP_
