@@ -13,6 +13,9 @@ qemu-system-x86_64 \
 	-device virtio-sound \
 	-device VGA \
 	-device virtio-gpu-pci \
+	-device qemu-xhci \
+	-device usb-mouse \
+	-device usb-kbd \
 	-boot order=c \
 	-drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/x64/OVMF_CODE.4m.fd \
 	-drive if=pflash,format=raw,file=OVMF_VARS.4m.fd \

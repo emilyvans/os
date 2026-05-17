@@ -214,7 +214,6 @@ extern "C" void kmain(void) {
 	// while (miliseconds < 10000) {
 	// };
 
-	clear_console();
 	/*PCIDeviceID ids[] = {
 	    {.vendor_id = 0x1AF4, .device_id = PCI_ANY_ID}, {0}};
 	PCIDriver virtio_drv = {
@@ -224,6 +223,7 @@ extern "C" void kmain(void) {
 	};*/
 	// register_pci_device(dev);
 	register_pci_driver(&virtio_blk_drv);
+	clear_console();
 	printf("total Memory: %uMiB\nfree memory:  %uMiB\n",
 	       physicalmemory::get_total_ram() / 1024 / 1024,
 	       physicalmemory::get_free_ram() / 1024 / 1024);

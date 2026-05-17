@@ -77,6 +77,7 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/drive.hdd
 	COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd ${CMAKE_CURRENT_BINARY_DIR}/drive.hdd
 	COMMAND mcopy -o -i drive.hdd@@1M ${CMAKE_CURRENT_BINARY_DIR}/myos ::/boot
+	COMMAND cp drive.hdd drive.img
 	DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 			myos
 	COMMENT making drive.hdd

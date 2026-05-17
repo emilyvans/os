@@ -1,10 +1,11 @@
 #ifndef INCLUDE_DRIVER_VIRTIO_BLK_HPP_
 #define INCLUDE_DRIVER_VIRTIO_BLK_HPP_
 #include "driver/pci.hpp"
+#include <stdint.h>
 
 extern PCIDriver virtio_blk_drv;
 
-typedef struct virtio_pci_capability {
+typedef struct VirtioPciCapability_s {
 	pci_capability capability;
 	uint8_t length;
 	uint8_t config_type;
@@ -13,14 +14,14 @@ typedef struct virtio_pci_capability {
 	uint8_t padding[2];
 	uint32_t offset;
 	uint32_t struct_length;
-} __attribute__((packed)) virtio_pci_capability;
+} __attribute__((packed)) VirtioPciCapability;
 
 #define VIRTIO_PCI_CAP_COMMON_CFG 1
 #define VIRTIO_PCI_CAP_NOTIFY_CFG 2
 #define VIRTIO_PCI_CAP_ISR_CFG 3
 #define VIRTIO_PCI_CAP_DEVICE_CFG 4
 
-typedef struct virtio_blk_config {
+typedef struct VirtioBlkConfig_s {
 	uint64_t capacity;
 	uint32_t size_max;
 	uint32_t seg_max;
@@ -62,9 +63,9 @@ typedef struct virtio_blk_config {
 		uint8_t model;
 		uint8_t unused2[3];
 	} zoned;
-} __attribute__((packed)) virtio_blk_config;
+} __attribute__((packed)) VirtioBlkConfig;
 
-typedef struct virtio_pci_common_cfg {
+typedef struct VirtioPciCommonCfg_s {
 	uint32_t device_feature_select;
 	uint32_t device_feature;
 	uint32_t driver_feature_select;
@@ -83,6 +84,11 @@ typedef struct virtio_pci_common_cfg {
 	uint64_t queue_device;
 	uint16_t queue_notify_data;
 	uint16_t queue_reset;
-} __attribute__((packed)) virtio_pci_common_cfg;
+} __attribute__((packed)) VirtioPciCommonCfg;
+
+typedef struct VirtioPciNotifyCfg_s {
+	VirtioPciCapability cap;
+	uint32_t notify_off_multiplier;
+} VirtioPciNotifyCfg;
 
 #endif // INCLUDE_DRIVER_VIRTIO_BLK_HPP_
