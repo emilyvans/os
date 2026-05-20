@@ -4,6 +4,7 @@
 #include "limine/limine_requests.hpp"
 #include "memory/virtual_memory.hpp"
 #include "panic.hpp"
+#include "utils.hpp"
 #include <stdint.h>
 
 void print_pci_device(volatile pci_header *pci_device, uint8_t function = 0) {
@@ -153,14 +154,91 @@ void print_features(VirtioPciCommonCfg *cfg) {
 	}
 }
 
-void create_virtqueue(volatile VirtioPciCommonCfg *cfg, uint32_t index) {
+typedef struct VirtQueueDescriptor_s {
+	uint64_t address;
+	uint32_t length;
+	uint16_t flags;
+	uint16_t next;
+} __attribute__((packed)) VirtQueueDescriptor;
+
+typedef struct VirtQueueAvailable_s {
+	uint16_t flags;
+	uint16_t idx;
+	uint16_t ring[];
+} __attribute__((packed)) VirtQueueAvailable;
+
+typedef struct VirtQueueUsedElement_s {
+	uint32_t id;
+	uint32_t length;
+} __attribute__((packed)) VirtQueueUsedElement;
+
+typedef struct VirtQueueUsed_s {
+	uint16_t flags;
+	uint16_t idx;
+	VirtQueueUsedElement ring[];
+} __attribute__((packed)) VirtQueueUsed;
+
+typedef struct VirtQueue_s {
+	uint16_t number;
+	uint16_t size;
+	uint64_t notify_offset;
+	VirtQueueDescriptor *descriptor_table;
+	VirtQueueAvailable *available_ring;
+	VirtQueueUsed *used_ring;
+} VirtQueue;
+
+typedef struct VirtioBlkReq_s {
+	uint32_t type;
+	uint32_t reserved;
+	uint64_t sector;
+	uint8_t data[];
+} __attribute__((packed)) VirtioBlkReq;
+
+VirtQueue *create_virtqueue(volatile VirtioPciCommonCfg *cfg, uint32_t index) {
 	cfg->queue_select = index;
+	uint64_t descriptor_table_size = 16 * cfg->queue_size;
+	uint64_t available_ring_size = 6 + (2 * cfg->queue_size);
+	uint64_t used_ring_size = 6 + (8 * cfg->queue_size);
+	uint64_t total_size =
+		descriptor_table_size + available_ring_size + used_ring_size;
+	VirtQueue *virt_queue =
+		(VirtQueue *)page_alloc(DIV_ROUNDUP(total_size, 4096));
+	if (virt_queue == nullptr) {
+		return nullptr;
+	}
+	memset(virt_queue, 0, ALIGN_UP(total_size, 4096));
+
+	virt_queue->size = cfg->queue_size;
+	virt_queue->number = index;
+
+	virt_queue->descriptor_table = (VirtQueueDescriptor *)ALIGN_UP(
+		(uint64_t)virt_queue + sizeof(VirtQueue), 16);
+	virt_queue->available_ring = (VirtQueueAvailable *)ALIGN_UP(
+		(uint64_t)virt_queue->descriptor_table + descriptor_table_size, 2);
+	virt_queue->used_ring = (VirtQueueUsed *)ALIGN_UP(
+		(uint64_t)virt_queue->available_ring + available_ring_size, 4);
+	virt_queue->notify_offset = cfg->queue_notify_off;
+
+	cfg->queue_desc =
+		(uint64_t)virt_queue->descriptor_table - hhdm_request.response->offset;
+	cfg->queue_driver =
+		(uint64_t)virt_queue->available_ring - hhdm_request.response->offset;
+	cfg->queue_device =
+		(uint64_t)virt_queue->used_ring - hhdm_request.response->offset;
+
+	cfg->queue_enable = 1;
+	__sync_synchronize();
+
 	printf("sel: %u, size: %u, msix: %u, enable: %u, notify offset: %u, desc: "
-	       "0x%x, driver: 0x%x, device: 0x%x\n",
+	       "0x%x, driver: 0x%x, device: 0x%x, desc_size: %u, avail_size: %u, "
+	       "used_size: %u, status: %b, fail: %b \n",
 	       (uint16_t)cfg->queue_select, (uint16_t)cfg->queue_size,
 	       (uint16_t)cfg->queue_msix_vector, (uint16_t)cfg->queue_enable,
 	       (uint16_t)cfg->queue_notify_off, (uint64_t)cfg->queue_desc,
-	       (uint64_t)cfg->queue_driver, (uint64_t)cfg->queue_device);
+	       (uint64_t)cfg->queue_driver, (uint64_t)cfg->queue_device,
+	       descriptor_table_size, available_ring_size, used_ring_size,
+	       (uint64_t)(uint8_t)cfg->device_status, 128);
+	return virt_queue;
 }
 
 int virtio_blk_probe(PCIDevice *device) {
@@ -294,7 +372,6 @@ int virtio_blk_probe(PCIDevice *device) {
 	if (is_feature_available(common_config, 32)) {
 		set_feature(common_config, 32);
 	}
-	set_feature(common_config, 12);
 	common_config->device_status |= DEVICE_FEATURES_OK;
 
 	common_config->driver_feature_select = 0;
@@ -319,7 +396,57 @@ int virtio_blk_probe(PCIDevice *device) {
 	       device_config->geometry.sectors, device_config->blk_size,
 	       device_config->num_queues);
 
-	create_virtqueue(common_config, 0);
+	VirtQueue *virt_queue = create_virtqueue(common_config, 0);
+	common_config->device_status |= 4;
+	// FIXME: remove the code for real use
+	uint64_t request_size = sizeof(VirtioBlkReq);
+	VirtioBlkReq *data = (VirtioBlkReq *)kzalloc(request_size + 513);
+	data->sector = 0;
+	uint64_t base_phys = (uint64_t)data - hhdm_request.response->offset;
+	virt_queue->descriptor_table->address = base_phys;
+	virt_queue->descriptor_table->length = request_size;
+	virt_queue->descriptor_table->flags = 1;
+	virt_queue->descriptor_table->next = 1;
+
+	virt_queue->descriptor_table[1].address = base_phys + sizeof(VirtioBlkReq);
+	virt_queue->descriptor_table[1].length = 512;
+	virt_queue->descriptor_table[1].flags = 3;
+	virt_queue->descriptor_table[1].next = 2;
+
+	virt_queue->descriptor_table[2].address =
+		base_phys + sizeof(VirtioBlkReq) + 512;
+	virt_queue->descriptor_table[2].length = 1;
+	virt_queue->descriptor_table[2].flags = 2;
+
+	virt_queue->available_ring->ring[0] = 0;
+	__sync_synchronize();
+	virt_queue->available_ring->idx++;
+	__sync_synchronize();
+	// write 0 to notify
+	BarAddress addr =
+		get_address_from_bar(virtio_block_device, notify_config->cap.bar);
+	uint16_t *idx = (uint16_t *)(hhdm_request.response->offset + addr.address +
+	                             notify_config->cap.offset +
+	                             virt_queue->notify_offset *
+	                                 notify_config->notify_off_multiplier);
+	*idx = 0;
+	__sync_synchronize();
+	while (virt_queue->used_ring->idx != 1)
+		;
+
+	uint8_t status = *((uint8_t *)data + sizeof(VirtioBlkReq) + 512);
+	uint8_t *disk_data = (uint8_t *)data + sizeof(VirtioBlkReq);
+
+	printf("status: 0x%x\n", (uint64_t)status);
+
+	printf("data: \n");
+	for (uint64_t i = 0; i < 512; i += 8) {
+		printf(" 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", disk_data[i + 0],
+		       disk_data[i + 1], disk_data[i + 2], disk_data[i + 3],
+		       disk_data[i + 4], disk_data[i + 5], disk_data[i + 6],
+		       disk_data[i + 7]);
+	}
+	printf("\n");
 
 	return 0;
 };

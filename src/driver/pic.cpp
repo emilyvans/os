@@ -42,7 +42,7 @@ void init_PIC() {
 	io_wait();
 
 	// mask both PICs.
-	outb(PIC1_DATA, 0xFF);
+	outb(PIC1_DATA, 0xFB); // unmasked pic int 2 to enable the slave pic
 	outb(PIC2_DATA, 0xFF);
 	asm("sti");
 }

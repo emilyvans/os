@@ -79,17 +79,27 @@ volatile uint64_t miliseconds = 0;
 void PIC_timer_handler() {
 	// printf("timer\n");
 	miliseconds += 1;
-	PIC_send_EOI(0);
 }
 
 void keyboard_interrupt_handler() {
 	ps2_on_interrupt();
-	PIC_send_EOI(1);
+}
+
+void PCI_interrupt_handler(InterruptFrame *frame) {
+	clear_console();
+	printf("pci int\n");
 }
 
 void unknown_handler(InterruptFrame *frame) {
 	clear_console();
-	printf("unknow exception\nnumber: %x\n", frame->interupt_nr);
+	if (frame->interupt_nr > 0x20 && frame->interupt_nr < 0x30) {
+		printf(
+			"unknow pic interrupt\noriginal number: %x\npic number: %x(%u)\n",
+			frame->interupt_nr, frame->interupt_nr - 0x20,
+			frame->interupt_nr - 0x20);
+	} else {
+		printf("unknow exception\nnumber: %x\n", frame->interupt_nr);
+	}
 	hcf();
 }
 
@@ -123,9 +133,15 @@ void interrupt_handler(InterruptFrame *frame) {
 		break;
 	case 0x20:
 		PIC_timer_handler();
+		PIC_send_EOI(0x0);
 		break;
 	case 0x21:
 		keyboard_interrupt_handler();
+		PIC_send_EOI(0x1);
+		break;
+	case 0x2B:
+		PCI_interrupt_handler(frame);
+		PIC_send_EOI(0xB);
 		break;
 	default:
 		unknown_handler(frame);
@@ -222,6 +238,8 @@ extern "C" void kmain(void) {
 	    .id_table = ids,
 	};*/
 	// register_pci_device(dev);
+	PIC_unmask_interrupt(11);
+
 	register_pci_driver(&virtio_blk_drv);
 	clear_console();
 	printf("total Memory: %uMiB\nfree memory:  %uMiB\n",
