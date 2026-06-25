@@ -94,7 +94,7 @@ void physicalmemory::initialize() {
 			uint64_t page_count = DIV_ROUNDUP(entry->length, 4096);
 			total_size += (DIV_ROUNDUP(page_count, 8) + sizeof(MemoryRegion));
 			memory_region_count++;
-			printf("start: 0x%x, size 0x%x, type: 0x%x\n", entry->base,
+			printf("start: 0x%lx, size 0x%lx, type: 0x%lx\n", entry->base,
 			       entry->length, entry->type);
 		}
 	}

@@ -34,6 +34,7 @@ set(SOURCES
 	./src/driver/pci.cpp
 	./src/list/klist.cpp
 	./src/driver/virtio_blk.cpp
+	./src/disk.cpp
 )
 
 add_executable(myos ${SOURCES})
@@ -53,7 +54,7 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine bios-install
 		${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND mformat -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
-	COMMAND mmd -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine
+	COMMAND mmd -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine ::/longname ::/realylongname ::/extremelylongname
 	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
 		${CMAKE_CURRENT_SOURCE_DIR}/limine.conf
 		${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine-bios.sys

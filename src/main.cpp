@@ -1,6 +1,7 @@
 #include "cpu/GDT.hpp"
 #include "cpu/asm.hpp"
 #include "cpu/interrupts.hpp"
+#include "disk.hpp"
 #include "driver/acpi.hpp"
 #include "driver/console.hpp"
 #include "driver/device.hpp"
@@ -18,7 +19,9 @@
 #include "programs/shell.hpp"
 #include "stdbool.h"
 #include "stddef.h"
+#include "utils.hpp"
 #include <limine.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define background_color 0x1d1f21
@@ -46,8 +49,8 @@ void pf_handler(InterruptFrame *frame) {
 
 	// CR2 contains the linear address that caused the fault
 	asm volatile("mov %%cr2, %0" : "=r"(fault_address));
-	printf("\npage fault\ntype: %x\nip: %x\ncs: %x\nflags: %x\nsp: %x\nss: "
-	       "%x\nerror code: %x\noffending address: 0x%x",
+	printf("\npage fault\ntype: %x\nip: %lx\ncs: %lx\nflags: %lx\nsp: %lx\nss: "
+	       "%lx\nerror code: %lx\noffending address: 0x%lx",
 	       0xE, frame->rip, frame->cs, frame->flags, frame->sp, frame->ss,
 	       frame->error_code, fault_address);
 	hcf();
@@ -61,15 +64,15 @@ void double_fault_handler(InterruptFrame *frame) {
 void gp_handler(InterruptFrame *frame) {
 	(void)frame; // to remove warning
 	// clear_console();
-	printf("general protation\nRIP=%x CS=%x RFLAGS=%x\nerror=%b\n", frame->rip,
-	       frame->cs, frame->flags, frame->error_code);
+	printf("general protation\nRIP=%lx CS=%lx RFLAGS=%lx\nerror=%lb\n",
+	       frame->rip, frame->cs, frame->flags, frame->error_code);
 	hcf();
 }
 void iop_handler(InterruptFrame *frame) {
 	(void)frame; // to remove warning
 	clear_console();
 	printf("invalid opcode\n");
-	printf("RIP: 0x%x\n", frame->rip);
+	printf("RIP: 0x%lx\n", frame->rip);
 	printf("opcode byte 1: 0x%x", *(uint8_t *)frame->rip);
 	hcf();
 }
@@ -93,12 +96,12 @@ void PCI_interrupt_handler(InterruptFrame *frame) {
 void unknown_handler(InterruptFrame *frame) {
 	clear_console();
 	if (frame->interupt_nr > 0x20 && frame->interupt_nr < 0x30) {
-		printf(
-			"unknow pic interrupt\noriginal number: %x\npic number: %x(%u)\n",
-			frame->interupt_nr, frame->interupt_nr - 0x20,
-			frame->interupt_nr - 0x20);
+		printf("unknow pic interrupt\noriginal number: %lx\npic number: "
+		       "%lx(%lu)\n",
+		       frame->interupt_nr, frame->interupt_nr - 0x20,
+		       frame->interupt_nr - 0x20);
 	} else {
-		printf("unknow exception\nnumber: %x\n", frame->interupt_nr);
+		printf("unknow exception\nnumber: %lx\n", frame->interupt_nr);
 	}
 	hcf();
 }
@@ -159,9 +162,8 @@ void sleep(uint64_t ms) {
 	return;
 }
 
-/// temp
-int VIRTIO_PROBE(PCIDevice *pci_dev);
-int VIRTIO_MATCH(Device *dev, Driver *drv);
+/// FIXME: temp
+void test();
 /// end temp
 
 extern "C" void kmain(void) {
@@ -193,7 +195,7 @@ extern "C" void kmain(void) {
 	physicalmemory::initialize();
 	virtualmemory::initialize();
 
-	printf("total Memory: %uMiB\nfree memory:  %uMiB\n",
+	printf("total Memory: %luMiB\nfree memory:  %luMiB\n",
 	       physicalmemory::get_total_ram() / 1024 / 1024,
 	       physicalmemory::get_free_ram() / 1024 / 1024);
 
@@ -230,21 +232,15 @@ extern "C" void kmain(void) {
 	// while (miliseconds < 10000) {
 	// };
 
-	/*PCIDeviceID ids[] = {
-	    {.vendor_id = 0x1AF4, .device_id = PCI_ANY_ID}, {0}};
-	PCIDriver virtio_drv = {
-	    .probe = &VIRTIO_PROBE,
-	    .name = "VIRTIO",
-	    .id_table = ids,
-	};*/
-	// register_pci_device(dev);
-	PIC_unmask_interrupt(11);
+	// PIC_unmask_interrupt(11);
 
 	register_pci_driver(&virtio_blk_drv);
 	clear_console();
-	printf("total Memory: %uMiB\nfree memory:  %uMiB\n",
+	printf("total Memory: %luMiB\nfree memory:  %luMiB\n",
 	       physicalmemory::get_total_ram() / 1024 / 1024,
 	       physicalmemory::get_free_ram() / 1024 / 1024);
+
+	test();
 
 	//  convert this to a non busy-loop
 	for (;;) {
@@ -259,9 +255,188 @@ extern "C" void kmain(void) {
 		}
 	}
 }
-int VIRTIO_PROBE(PCIDevice *pci_dev) {
-	printf("virtio probe\n");
-	printf("bus: %s, devid: 0x%x, addr: %x\n", pci_dev->device.bus->name,
-	       pci_dev->device_id, pci_dev->config_address);
-	return 1;
+
+typedef struct MBRPartitionEntry_s {
+	uint8_t boot_indicator;
+	uint8_t start_cylinder;
+	uint8_t start_head;
+	uint8_t start_sector;
+	uint8_t os_type;
+	uint8_t end_cylinder;
+	uint8_t end_head;
+	uint8_t end_sector;
+	uint32_t starting_LBA;
+	uint32_t size_in_LBA;
+} __attribute__((packed)) MBRPartitionEntry;
+
+typedef struct MBR_s {
+	uint8_t bootstrap_code_1[218];
+	uint8_t zero[2];
+	uint8_t orig_phys_drive;
+	uint8_t seconds;
+	uint8_t minutes;
+	uint8_t hours;
+	uint8_t bootstrap_code_2[216];
+	uint32_t disk_sig;
+	uint16_t copy_protected;
+	MBRPartitionEntry partitions[4];
+	uint8_t boot_signature[2];
+} __attribute__((packed)) MBR;
+
+typedef struct FAT_BPB_s {
+	uint8_t jmp_boot[3];
+	char oem_name[8];
+	uint16_t bytes_per_sector;
+	uint8_t sectors_per_cluster;
+	uint16_t reserved_sector_count;
+	uint8_t number_of_FATs;
+	uint16_t root_entry_count;
+	uint16_t total_sector_count_16;
+	uint8_t media;
+	uint16_t FAT_size_16;
+	uint16_t sectors_per_track;
+	uint16_t number_of_head;
+	uint32_t hidden_sectors;
+	uint32_t total_sector_count_32;
+	union {
+		struct {
+			uint8_t drive_number;
+			uint8_t reserved;
+			uint8_t boot_signature;
+			uint32_t volume_id;
+			char volume_label[11];
+			char filesystem_type[8];
+		} __attribute__((packed)) FAT_12_16;
+		struct {
+			uint32_t FAT_size_32;
+			uint16_t extra_flags;
+			uint16_t filesystem_version;
+			uint32_t root_cluster;
+			uint16_t filesystem_info;
+			uint16_t backup_boot_sector;
+			uint8_t reserved[12];
+			uint8_t drive_number;
+			uint8_t reserved1;
+			uint8_t boot_signature;
+			uint32_t volume_id;
+			char volume_label[11];
+			char filesystem_type[8];
+
+		} __attribute__((packed)) FAT_32;
+	};
+} __attribute__((packed)) FAT_BPB;
+
+void test() {
+
+	if (sizeof(FAT_BPB) != 90) {
+		printf("error fat_size: %lu must be 90", sizeof(FAT_BPB));
+	}
+	if (disk_list.next == &disk_list) {
+		printf("no disks registed");
+	}
+	Disk *disk = container_of(disk_list.next, Disk, global);
+	if (disk->file_ops.read == nullptr) {
+		printf("disk doesn't have read function");
+	}
+
+	uint8_t *boot_sector = (uint8_t *)kalloc(512);
+	disk->file_ops.read(*disk, 0, boot_sector, 1);
+
+	MBR mbr;
+	memcpy(&mbr, boot_sector, 512);
+
+	MBRPartitionEntry boot_partition_entry = {};
+	for (uint32_t i = 0; i < 4; i++) {
+		MBRPartitionEntry entry = mbr.partitions[i];
+		if ((entry.boot_indicator & 0x80) &&
+		    boot_partition_entry.boot_indicator == 0) {
+			boot_partition_entry = mbr.partitions[i];
+		}
+		printf("----------------------------------------------------\n");
+		printf("boot indicator: %hhx\nstart_cylinder: %hhu\nstart_head: %hhu\n"
+		       "start_sector: %hhu\nos_type: %hhu\nend_cylinder: %hhu\n"
+		       "end_head: %hhu\nend_sector: %hhu\nstarting LBA: %u\n"
+		       "size in LBA: %u\n",
+		       entry.boot_indicator, entry.start_cylinder, entry.start_head,
+		       entry.start_sector, entry.os_type, entry.end_cylinder,
+		       entry.end_head, entry.end_sector, entry.starting_LBA,
+		       entry.size_in_LBA);
+	}
+	printf("----------------------------------------------------\n");
+	uint64_t fat_part_start_sector = boot_partition_entry.starting_LBA;
+	memset(boot_sector, 0, 512);
+	disk->file_ops.read(*disk, fat_part_start_sector, boot_sector, 1);
+	printf("bpb data: \n");
+	for (uint64_t i = 0; i < 512; i += 8) {
+		printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
+		       boot_sector[i + 0], boot_sector[i + 1], boot_sector[i + 2],
+		       boot_sector[i + 3], boot_sector[i + 4], boot_sector[i + 5],
+		       boot_sector[i + 6], boot_sector[i + 7]);
+	}
+	printf("\n");
+
+	FAT_BPB fat_bpb;
+	memcpy(&fat_bpb, boot_sector, sizeof(FAT_BPB));
+
+	uint64_t root_directory_sectors =
+		((fat_bpb.root_entry_count * 32) + (fat_bpb.bytes_per_sector - 1)) /
+		fat_bpb.bytes_per_sector;
+
+	uint32_t fat_size;
+	uint32_t total_sectors;
+	if (fat_bpb.FAT_size_16 != 0) {
+		fat_size = fat_bpb.FAT_size_16;
+	} else {
+		fat_size = fat_bpb.FAT_32.FAT_size_32;
+	}
+
+	if (fat_bpb.total_sector_count_16 != 0) {
+		total_sectors = fat_bpb.total_sector_count_16;
+	} else {
+		total_sectors = fat_bpb.total_sector_count_32;
+	}
+	uint64_t data_sector_count =
+		total_sectors -
+		(fat_bpb.reserved_sector_count + (fat_bpb.number_of_FATs * fat_size) +
+	     root_directory_sectors);
+
+	uint64_t cluster_count = data_sector_count / fat_bpb.sectors_per_cluster;
+
+	printf("cluster count: %lu\n", cluster_count);
+	if (cluster_count < 4085) {
+		printf("FAT12\n");
+	} else if (cluster_count < 65525) {
+		printf("FAT16\n");
+	} else {
+		printf("FAT32\n");
+	}
+	uint64_t fat_start_sector =
+		fat_part_start_sector + fat_bpb.reserved_sector_count;
+
+	disk->file_ops.read(*disk, fat_start_sector, boot_sector, 1);
+	printf("fat data(part_start + %hu): \n", fat_bpb.reserved_sector_count);
+	for (uint64_t i = 0; i < 512; i += 8) {
+		printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
+		       boot_sector[i + 0], boot_sector[i + 1], boot_sector[i + 2],
+		       boot_sector[i + 3], boot_sector[i + 4], boot_sector[i + 5],
+		       boot_sector[i + 6], boot_sector[i + 7]);
+	}
+	printf("\n");
+
+	for (uint64_t sector = fat_part_start_sector +
+	                       fat_bpb.reserved_sector_count +
+	                       (fat_bpb.number_of_FATs * fat_size),
+	              i = 0;
+	     i < root_directory_sectors; i++, sector++) {
+		disk->file_ops.read(*disk, sector, boot_sector, 1);
+
+		printf("root dir(%lu sec): \n", sector - fat_part_start_sector);
+		for (uint64_t i = 0; i < 512; i += 8) {
+			printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
+			       boot_sector[i + 0], boot_sector[i + 1], boot_sector[i + 2],
+			       boot_sector[i + 3], boot_sector[i + 4], boot_sector[i + 5],
+			       boot_sector[i + 6], boot_sector[i + 7]);
+		}
+		printf("\n");
+	}
 }

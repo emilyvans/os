@@ -91,4 +91,41 @@ BarAddress get_address_from_bar(volatile pci_header *pci_device,
 	return result;
 }
 
+void print_pci_device(volatile pci_header *pci_device, uint8_t function) {
+	if (pci_device->header_type & 0x80) {
+		printf("-----------------------------------%hhu\n", function);
+	} else {
+		printf("------------------------------------\n");
+	}
+	printf("vendor: 0x%x\ndevice: 0x%x\ncommand: 0x%x\nstatus: "
+	       "%b\nrevision_id: 0x%x\nprog_if: 0x%x\nclass: 0x%x\n"
+	       "subclass: 0x%x\ncacheline_size: 0x%x\nlatency_timer: "
+	       "0x%x\ntype: 0x%x\nBIST: 0x%x\n",
+	       pci_device->Vendor_ID, pci_device->device_ID, pci_device->command,
+	       pci_device->status, pci_device->revision_ID, pci_device->prog_IF,
+	       pci_device->class_code, pci_device->subclass,
+	       pci_device->cache_line_size, pci_device->latency_timer,
+	       pci_device->header_type, pci_device->BIST);
+
+	if ((pci_device->header_type & 0x7F) == 0x0) {
+		printf("bar0: 0x%x\nbar1: 0x%x\nbar2: 0x%x\nbar3: 0x%x\nbar4: "
+		       "0x%x\nbar5: 0x%x\ncardbus_CIS_pointer: 0x%x\n"
+		       "subsystem_vendor: 0x%x\nsubsystem: 0x%x\n"
+		       "expansion_rom: 0x%x\ncapabilities_pointer: 0x%x\n"
+		       "interrupt_line: 0x%x\ninterrupt_pin: 0x%x\nmin_grant: "
+		       "0x%x\nmax_latency: 0x%x\n",
+		       pci_device->type_0.BAR0, pci_device->type_0.BAR1,
+		       pci_device->type_0.BAR2, pci_device->type_0.BAR3,
+		       pci_device->type_0.BAR4, pci_device->type_0.BAR5,
+		       pci_device->type_0.Cardbus_CIS_pointer,
+		       pci_device->type_0.subsystem_vendor_id,
+		       pci_device->type_0.subsystem_id,
+		       pci_device->type_0.expansion_ROM_base_address,
+		       pci_device->type_0.capabilities_pointer,
+		       pci_device->type_0.interrupt_line,
+		       pci_device->type_0.interrupt_pin, pci_device->type_0.min_grant,
+		       pci_device->type_0.max_latency);
+	}
+}
+
 BusType pci_bus = {.name = "PCI", .match = &PCI_MATCH, .probe = &PCI_PROBE};

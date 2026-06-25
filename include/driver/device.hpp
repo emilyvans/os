@@ -5,26 +5,27 @@
 #include <stdint.h>
 
 typedef struct Device {
-	struct KListHead list_global;
-	struct KListHead list_bus;
-	struct KListHead list_driver;
+	KListHead list_global;
+	KListHead list_bus;
+	KListHead list_driver;
 	struct Driver *active_driver = nullptr;
 	struct BusType *bus = nullptr;
+	void *driver_data;
 } Device;
 
 typedef struct Driver {
 	const char *name;
-	struct KListHead list_global;
-	struct KListHead list_bus;
-	struct KListHead device_list;
+	KListHead list_global;
+	KListHead list_bus;
+	KListHead device_list;
 	int (*probe)(Device *device);
 } Driver;
 
 typedef struct BusType {
 	const char *name;
-	struct KListHead driver_list;
-	struct KListHead device_list;
-	struct KListHead bus_list;
+	KListHead driver_list;
+	KListHead device_list;
+	KListHead bus_list;
 	int (*probe)(Device *device);
 	int (*match)(Device *device, Driver *driver);
 } BusType;

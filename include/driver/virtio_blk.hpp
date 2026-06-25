@@ -1,6 +1,7 @@
 #ifndef INCLUDE_DRIVER_VIRTIO_BLK_HPP_
 #define INCLUDE_DRIVER_VIRTIO_BLK_HPP_
 #include "driver/pci.hpp"
+#include "list/klist.hpp"
 #include <stdint.h>
 
 extern PCIDriver virtio_blk_drv;
@@ -90,5 +91,55 @@ typedef struct VirtioPciNotifyCfg_s {
 	VirtioPciCapability cap;
 	uint32_t notify_off_multiplier;
 } VirtioPciNotifyCfg;
+
+typedef struct VirtQueueDescriptor_s {
+	uint64_t address;
+	uint32_t length;
+	uint16_t flags;
+	uint16_t next;
+} __attribute__((packed)) VirtQueueDescriptor;
+
+typedef struct VirtQueueAvailable_s {
+	uint16_t flags;
+	uint16_t idx;
+	uint16_t ring[];
+} __attribute__((packed)) VirtQueueAvailable;
+
+typedef struct VirtQueueUsedElement_s {
+	uint32_t id;
+	uint32_t length;
+} __attribute__((packed)) VirtQueueUsedElement;
+
+typedef struct VirtQueueUsed_s {
+	uint16_t flags;
+	uint16_t idx;
+	VirtQueueUsedElement ring[];
+} __attribute__((packed)) VirtQueueUsed;
+
+typedef struct VirtQueue_s {
+	KListHead list;
+	uint16_t number;
+	uint16_t size;
+	uint64_t notify_address;
+	uint16_t next_descriptor_index;
+	VirtQueueDescriptor *descriptor_table;
+	VirtQueueAvailable *available_ring;
+	VirtQueueUsed *used_ring;
+} VirtQueue;
+
+typedef struct VirtioBlkReq_s {
+	uint32_t type;
+	uint32_t reserved;
+	uint64_t sector;
+} __attribute__((packed)) VirtioBlkReq;
+
+typedef struct VirtioBlk_s {
+	PCIDevice *pci_device;
+	VirtioBlkConfig *device_config;
+	VirtioPciCommonCfg *common_config;
+	VirtioPciNotifyCfg *notify_config;
+	uint8_t *isr_config;
+	KListHead virt_queues;
+} VirtioBlk;
 
 #endif // INCLUDE_DRIVER_VIRTIO_BLK_HPP_

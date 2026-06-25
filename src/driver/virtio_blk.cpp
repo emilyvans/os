@@ -1,54 +1,14 @@
 #include "driver/virtio_blk.hpp"
+#include "disk.hpp"
 #include "driver/console.hpp"
 #include "driver/pci.hpp"
 #include "limine/limine_requests.hpp"
+#include "list/container_of.hpp"
+#include "list/klist.hpp"
 #include "memory/virtual_memory.hpp"
 #include "panic.hpp"
 #include "utils.hpp"
 #include <stdint.h>
-
-void print_pci_device(volatile pci_header *pci_device, uint8_t function = 0) {
-	if (pci_device->header_type & 0x80) {
-		printf("-----------------------------------%u\n", (uint64_t)function);
-	} else {
-		printf("------------------------------------\n");
-	}
-	printf("vendor: 0x%x\ndevice: 0x%x\ncommand: 0x%x\nstatus: "
-	       "%b\nrevision_id: 0x%x\nprog_if: 0x%x\nclass: 0x%x\n"
-	       "subclass: 0x%x\ncacheline_size: 0x%x\nlatency_timer: "
-	       "0x%x\ntype: 0x%x\nBIST: 0x%x\n",
-	       (uint64_t)pci_device->Vendor_ID, (uint64_t)pci_device->device_ID,
-	       (uint64_t)pci_device->command, (uint64_t)pci_device->status,
-	       (uint64_t)pci_device->revision_ID, (uint64_t)pci_device->prog_IF,
-	       (uint64_t)pci_device->class_code, (uint64_t)pci_device->subclass,
-	       (uint64_t)pci_device->cache_line_size,
-	       (uint64_t)pci_device->latency_timer,
-	       (uint64_t)pci_device->header_type, (uint64_t)pci_device->BIST);
-
-	if ((pci_device->header_type & 0x7F) == 0x0) {
-		printf("bar0: 0x%x\nbar1: 0x%x\nbar2: 0x%x\nbar3: 0x%x\nbar4: "
-		       "0x%x\nbar5: 0x%x\ncardbus_CIS_pointer: 0x%x\n"
-		       "subsystem_vendor: 0x%x\nsubsystem: 0x%x\n"
-		       "expansion_rom: 0x%x\ncapabilities_pointer: 0x%x\n"
-		       "interrupt_line: 0x%x\ninterrupt_pin: 0x%x\nmin_grant: "
-		       "0x%x\nmax_latency: 0x%x\n",
-		       (uint64_t)pci_device->type_0.BAR0,
-		       (uint64_t)pci_device->type_0.BAR1,
-		       (uint64_t)pci_device->type_0.BAR2,
-		       (uint64_t)pci_device->type_0.BAR3,
-		       (uint64_t)pci_device->type_0.BAR4,
-		       (uint64_t)pci_device->type_0.BAR5,
-		       (uint64_t)pci_device->type_0.Cardbus_CIS_pointer,
-		       (uint64_t)pci_device->type_0.subsystem_vendor_id,
-		       (uint64_t)pci_device->type_0.subsystem_id,
-		       (uint64_t)pci_device->type_0.expansion_ROM_base_address,
-		       (uint64_t)pci_device->type_0.capabilities_pointer,
-		       (uint64_t)pci_device->type_0.interrupt_line,
-		       (uint64_t)pci_device->type_0.interrupt_pin,
-		       (uint64_t)pci_device->type_0.min_grant,
-		       (uint64_t)pci_device->type_0.max_latency);
-	}
-}
 
 PCIDeviceID id_table[] = {{.vendor_id = 0x1AF4, .device_id = 0x1001}, {0}};
 
@@ -154,47 +114,9 @@ void print_features(VirtioPciCommonCfg *cfg) {
 	}
 }
 
-typedef struct VirtQueueDescriptor_s {
-	uint64_t address;
-	uint32_t length;
-	uint16_t flags;
-	uint16_t next;
-} __attribute__((packed)) VirtQueueDescriptor;
-
-typedef struct VirtQueueAvailable_s {
-	uint16_t flags;
-	uint16_t idx;
-	uint16_t ring[];
-} __attribute__((packed)) VirtQueueAvailable;
-
-typedef struct VirtQueueUsedElement_s {
-	uint32_t id;
-	uint32_t length;
-} __attribute__((packed)) VirtQueueUsedElement;
-
-typedef struct VirtQueueUsed_s {
-	uint16_t flags;
-	uint16_t idx;
-	VirtQueueUsedElement ring[];
-} __attribute__((packed)) VirtQueueUsed;
-
-typedef struct VirtQueue_s {
-	uint16_t number;
-	uint16_t size;
-	uint64_t notify_offset;
-	VirtQueueDescriptor *descriptor_table;
-	VirtQueueAvailable *available_ring;
-	VirtQueueUsed *used_ring;
-} VirtQueue;
-
-typedef struct VirtioBlkReq_s {
-	uint32_t type;
-	uint32_t reserved;
-	uint64_t sector;
-	uint8_t data[];
-} __attribute__((packed)) VirtioBlkReq;
-
-VirtQueue *create_virtqueue(volatile VirtioPciCommonCfg *cfg, uint32_t index) {
+VirtQueue *create_virtqueue(volatile pci_header *pci_device,
+                            volatile VirtioPciNotifyCfg *notify_cfg,
+                            volatile VirtioPciCommonCfg *cfg, uint32_t index) {
 	cfg->queue_select = index;
 	uint64_t descriptor_table_size = 16 * cfg->queue_size;
 	uint64_t available_ring_size = 6 + (2 * cfg->queue_size);
@@ -217,7 +139,11 @@ VirtQueue *create_virtqueue(volatile VirtioPciCommonCfg *cfg, uint32_t index) {
 		(uint64_t)virt_queue->descriptor_table + descriptor_table_size, 2);
 	virt_queue->used_ring = (VirtQueueUsed *)ALIGN_UP(
 		(uint64_t)virt_queue->available_ring + available_ring_size, 4);
-	virt_queue->notify_offset = cfg->queue_notify_off;
+	BarAddress addr = get_address_from_bar(pci_device, notify_cfg->cap.bar);
+	virt_queue->notify_address =
+		(uint64_t)(hhdm_request.response->offset + addr.address +
+	               notify_cfg->cap.offset +
+	               cfg->queue_notify_off * notify_cfg->notify_off_multiplier);
 
 	cfg->queue_desc =
 		(uint64_t)virt_queue->descriptor_table - hhdm_request.response->offset;
@@ -229,43 +155,202 @@ VirtQueue *create_virtqueue(volatile VirtioPciCommonCfg *cfg, uint32_t index) {
 	cfg->queue_enable = 1;
 	__sync_synchronize();
 
-	printf("sel: %u, size: %u, msix: %u, enable: %u, notify offset: %u, desc: "
-	       "0x%x, driver: 0x%x, device: 0x%x, desc_size: %u, avail_size: %u, "
-	       "used_size: %u, status: %b, fail: %b \n",
-	       (uint16_t)cfg->queue_select, (uint16_t)cfg->queue_size,
-	       (uint16_t)cfg->queue_msix_vector, (uint16_t)cfg->queue_enable,
-	       (uint16_t)cfg->queue_notify_off, (uint64_t)cfg->queue_desc,
-	       (uint64_t)cfg->queue_driver, (uint64_t)cfg->queue_device,
-	       descriptor_table_size, available_ring_size, used_ring_size,
-	       (uint64_t)(uint8_t)cfg->device_status, 128);
+	printf(
+		"sel: %u, size: %u, msix: %u, enable: %u, notify offset: %u, desc: "
+		"0x%lx, driver: 0x%lx, device: 0x%lx, desc_size: %lu, avail_size: %lu, "
+		"used_size: %lu, status: %b, fail: %b \n",
+		cfg->queue_select, cfg->queue_size, cfg->queue_msix_vector,
+		cfg->queue_enable, cfg->queue_notify_off, cfg->queue_desc,
+		cfg->queue_driver, cfg->queue_device, descriptor_table_size,
+		available_ring_size, used_ring_size, cfg->device_status, 128);
 	return virt_queue;
 }
 
+uint16_t virt_queue_get_next_index(VirtQueue *virt_queue) {
+	uint16_t index = virt_queue->next_descriptor_index++ % virt_queue->size;
+	return index;
+}
+
+void virt_queue_notify(VirtQueue virt_queue) {
+	__sync_synchronize();
+	*((uint16_t *)virt_queue.notify_address) = 0;
+	__sync_synchronize();
+}
+
+uint16_t virt_queue_send_chain(VirtQueue *virt_queue,
+                               VirtQueueDescriptor *descriptors,
+                               uint16_t length) {
+	uint16_t index = virt_queue_get_next_index(virt_queue);
+	for (uint16_t i = 1; i < length; i++) {
+		descriptors[i - 1].next = virt_queue_get_next_index(virt_queue);
+	}
+
+	for (uint16_t i = 0, current_index = index; i < length; i++) {
+		virt_queue->descriptor_table[current_index] = descriptors[i];
+		if ((i + 1) < length) {
+			current_index = descriptors[i].next;
+		}
+	}
+	virt_queue->available_ring
+		->ring[virt_queue->available_ring->idx % virt_queue->size] = index;
+	__sync_synchronize();
+	virt_queue->available_ring->idx++;
+	__sync_synchronize();
+	return index;
+}
+
+void virtio_blk_read(Disk disk, uint64_t start_sector, void *buffer,
+                     uint64_t sector_count) {
+	VirtioBlk *device = (VirtioBlk *)disk.owner;
+	if (buffer == nullptr || sector_count == 0 || device == nullptr)
+		return;
+
+	VirtioBlkReq *request = (VirtioBlkReq *)kzalloc(sizeof(VirtioBlkReq) + 1);
+	uint8_t *status = (uint8_t *)request + sizeof(VirtioBlkReq);
+
+	request->type = 0;
+	request->sector = start_sector;
+
+	VirtQueueDescriptor descriptors[3];
+	descriptors[0] = {
+		.address = ((uint64_t)request) - hhdm_request.response->offset,
+		.length = sizeof(VirtioBlkReq),
+		.flags = 1,
+	};
+
+	descriptors[1] = {
+		.address = (uint64_t)buffer - hhdm_request.response->offset,
+		.length = 512 * (uint32_t)sector_count,
+		.flags = 3,
+	};
+
+	descriptors[2] = {
+		.address = ((uint64_t)status) - hhdm_request.response->offset,
+		.length = 1,
+		.flags = 2,
+	};
+
+	VirtQueue *virt_queue =
+		container_of(device->virt_queues.next, VirtQueue, list);
+
+	uint16_t start = virt_queue_send_chain(virt_queue, descriptors, 3);
+
+	uint16_t next_id = virt_queue->used_ring->idx + 1;
+#define ttt 0
+#if ttt
+	printf("ddd(before): \n");
+	for (uint64_t i = 0; i < 512; i += 8) {
+		printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
+		       ((uint8_t *)buffer)[i + 0], ((uint8_t *)buffer)[i + 1],
+		       ((uint8_t *)buffer)[i + 2], ((uint8_t *)buffer)[i + 3],
+		       ((uint8_t *)buffer)[i + 4], ((uint8_t *)buffer)[i + 5],
+		       ((uint8_t *)buffer)[i + 6], ((uint8_t *)buffer)[i + 7]);
+	}
+	printf("\n");
+#endif
+
+	virt_queue_notify(*virt_queue);
+#if 1
+	// while (virt_queue->used_ring->idx != next_id) {
+	//	asm("hlt");
+	// }
+
+	uint16_t last_seen = virt_queue->used_ring->idx;
+
+	while (1) {
+		__sync_synchronize();
+
+		uint16_t current = virt_queue->used_ring->idx;
+
+		while (last_seen != current) {
+			VirtQueueUsedElement *elem =
+				&virt_queue->used_ring->ring[last_seen % virt_queue->size];
+
+			if (elem->id == start)
+				goto done;
+
+			last_seen++;
+		}
+
+		asm("hlt");
+	}
+done:
+#if ttt
+	printf("ddd(after)(%lu): \n", start_sector);
+	for (uint64_t i = 0; i < 512; i += 8) {
+		printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
+		       ((uint8_t *)buffer)[i + 0], ((uint8_t *)buffer)[i + 1],
+		       ((uint8_t *)buffer)[i + 2], ((uint8_t *)buffer)[i + 3],
+		       ((uint8_t *)buffer)[i + 4], ((uint8_t *)buffer)[i + 5],
+		       ((uint8_t *)buffer)[i + 6], ((uint8_t *)buffer)[i + 7]);
+	}
+	printf("\n");
+#endif
+
+	// while (1) {
+	//	for (int i = 0; i < virt_queue->size; i++) {
+	//		if (virt_queue->used_ring->ring[i].id == start) {
+	//			goto done;
+	//		}
+	//	}
+	//	asm("hlt");
+	// }
+#else
+	VirtQueueUsedElement elem =
+		virt_queue->used_ring
+			->ring[(virt_queue->used_ring->idx - 1) % virt_queue->size];
+
+	while (elem.id != start) {
+		asm("hlt");
+		elem = virt_queue->used_ring
+		           ->ring[(virt_queue->used_ring->idx - 1) % virt_queue->size];
+	}
+#endif
+
+	kfree(request);
+
+	return;
+}
+
+void virtio_blk_write(Disk disk, uint64_t start_sector, void *buffer,
+                      uint64_t sector_count) {
+	VirtioBlk *device = (VirtioBlk *)disk.owner;
+	if (buffer == nullptr && sector_count == 0 && device == nullptr)
+		return;
+}
+
+FileOperations virtio_blk_fops = {
+	.read = &virtio_blk_read,
+	.write = &virtio_blk_write,
+};
+
 int virtio_blk_probe(PCIDevice *device) {
-	pci_header *virtio_block_device = (pci_header *)device->config_address;
-	print_pci_device(virtio_block_device);
+	pci_header *virtio_block_pci_device = (pci_header *)device->config_address;
+	VirtioBlk *virtio_block_device = (VirtioBlk *)kzalloc(sizeof(VirtioBlk));
+
+	device->device.driver_data = (void *)virtio_block_device;
+	virtio_block_device->pci_device = device;
+	klist_init(&virtio_block_device->virt_queues);
+
+	print_pci_device(virtio_block_pci_device);
+
 	pci_capability *capability =
-		(pci_capability *)((uint64_t)virtio_block_device +
-	                       (virtio_block_device->type_0.capabilities_pointer &
-	                        ~0x3));
+		(pci_capability
+	         *)((uint64_t)virtio_block_pci_device +
+	            (virtio_block_pci_device->type_0.capabilities_pointer & ~0x3));
 	// 64-bit bar 4: bar5[63:32] bar4[31:0]
 	bool mapped_bar[] = {false, false, false, false, false};
-	VirtioPciCommonCfg *common_config;
-	VirtioBlkConfig *device_config;
-	VirtioPciNotifyCfg *notify_config;
-	uint8_t *isr_config;
-	virtio_block_device->status;
 	printf("------------------------------------\n");
 	while (capability != nullptr) {
-		printf("address: 0x%x\n", capability);
-		if (capability->vendor == 0x9) {
+		printf("address: 0x%p\n", capability);
+		if (capability->id == 0x9) {
 			VirtioPciCapability *virtio_capability =
 				(VirtioPciCapability *)capability;
 
-			BarAddress addr = get_address_from_bar(virtio_block_device,
+			BarAddress addr = get_address_from_bar(virtio_block_pci_device,
 			                                       virtio_capability->bar);
 
-			printf("addr: 0x%x, type: %s, size: 0x%x\n",
+			printf("addr: 0x%lx, type: %s, size: 0x%lx\n",
 			       addr.address + virtio_capability->offset,
 			       addr.is_memory_space ? "memory" : "I/O", addr.size);
 
@@ -274,14 +359,12 @@ int virtio_blk_probe(PCIDevice *device) {
 					"vendor: 0x%x\nnext: 0x%x\nlength: 0x%x\nconfig_type: "
 					"0x%x\nbar: 0x%x\nid: 0x%x\noffset: 0x%x\nstruct_length: "
 					"0x%x\n",
-					(uint64_t)virtio_capability->capability.vendor,
-					(uint64_t)virtio_capability->capability.next,
-					(uint64_t)virtio_capability->length,
-					(uint64_t)virtio_capability->config_type,
-					(uint64_t)virtio_capability->bar,
-					(uint64_t)virtio_capability->id,
-					(uint64_t)virtio_capability->offset,
-					(uint64_t)virtio_capability->struct_length);
+					virtio_capability->capability.id,
+					virtio_capability->capability.next,
+					virtio_capability->length, virtio_capability->config_type,
+					virtio_capability->bar, virtio_capability->id,
+					virtio_capability->offset,
+					virtio_capability->struct_length);
 
 				if (!mapped_bar[virtio_capability->bar]) {
 					for (uint64_t offset = 0; offset < addr.size;
@@ -300,36 +383,36 @@ int virtio_blk_probe(PCIDevice *device) {
 
 				if (virtio_capability->config_type ==
 				    VIRTIO_PCI_CAP_DEVICE_CFG) {
-					device_config =
+					virtio_block_device->device_config =
 						(VirtioBlkConfig *)(addr.address +
 					                        hhdm_request.response->offset +
 					                        virtio_capability->offset);
 
 				} else if (virtio_capability->config_type ==
 				           VIRTIO_PCI_CAP_COMMON_CFG) {
-					common_config =
+					virtio_block_device->common_config =
 						(VirtioPciCommonCfg *)(addr.address +
 					                           hhdm_request.response->offset +
 					                           virtio_capability->offset);
 				} else if (virtio_capability->config_type ==
 				           VIRTIO_PCI_CAP_NOTIFY_CFG) {
-					notify_config = (VirtioPciNotifyCfg *)capability;
+					virtio_block_device->notify_config =
+						(VirtioPciNotifyCfg *)capability;
 				} else if (virtio_capability->config_type ==
 				           VIRTIO_PCI_CAP_ISR_CFG) {
-					isr_config =
+					virtio_block_device->isr_config =
 						(uint8_t *)(addr.address + virtio_capability->offset +
 					                hhdm_request.response->offset);
 				}
 			}
 		} else {
-			printf("vendor: %x next: %x\n", (uint64_t)capability->vendor,
-			       (uint64_t)capability->next);
+			printf("id: 0x%x next: 0x%x\n", capability->id, capability->next);
 		}
 		printf("------------------------------------\n");
 		if (capability->next == 0)
 			break;
 
-		capability = (pci_capability *)((uint64_t)virtio_block_device +
+		capability = (pci_capability *)((uint64_t)virtio_block_pci_device +
 		                                (capability->next & ~0x3));
 	}
 
@@ -342,97 +425,121 @@ int virtio_blk_probe(PCIDevice *device) {
 #define DEVICE_DEVICE_NEEDS_RESET 64
 #define DEVICE_FAILED 128
 
-	common_config->device_status = DEVICE_RESET;
-	common_config->device_status |= DEVICE_ACKNOWLEDGE;
-	common_config->device_status |= DEVICE_DRIVER;
+	virtio_block_device->common_config->device_status = DEVICE_RESET;
+	virtio_block_device->common_config->device_status |= DEVICE_ACKNOWLEDGE;
+	virtio_block_device->common_config->device_status |= DEVICE_DRIVER;
 
-	common_config->driver_feature_select = 0;
-	common_config->device_feature_select = 0;
+	virtio_block_device->common_config->driver_feature_select = 0;
+	virtio_block_device->common_config->device_feature_select = 0;
 	printf("dev_feaures_select: %b\n",
-	       (uint64_t)common_config->device_feature_select);
-	printf("dev_feaures: %b\n", (uint16_t)common_config->device_feature);
+	       virtio_block_device->common_config->device_feature_select);
+	printf("dev_feaures: %b\n",
+	       virtio_block_device->common_config->device_feature);
 	printf("drv_feaures_select: %b\n",
-	       (uint64_t)common_config->driver_feature_select);
-	printf("drv_feaures: %b\n", (uint16_t)common_config->driver_feature);
-	print_features(common_config);
+	       virtio_block_device->common_config->driver_feature_select);
+	printf("drv_feaures: %b\n",
+	       virtio_block_device->common_config->driver_feature);
+	print_features(virtio_block_device->common_config);
 	// SEG_MAX(2) GEOMETRY(4) BLK_SIZE(6) EVENT_IDX(29) VERSION_1(32)
 
-	if (is_feature_available(common_config, 2)) {
-		set_feature(common_config, 2);
+	if (is_feature_available(virtio_block_device->common_config, 2)) {
+		set_feature(virtio_block_device->common_config, 2);
 	}
-	if (is_feature_available(common_config, 4)) {
-		set_feature(common_config, 4);
+	if (is_feature_available(virtio_block_device->common_config, 4)) {
+		set_feature(virtio_block_device->common_config, 4);
 	}
-	if (is_feature_available(common_config, 6)) {
-		set_feature(common_config, 6);
+	if (is_feature_available(virtio_block_device->common_config, 6)) {
+		set_feature(virtio_block_device->common_config, 6);
 	}
-	if (is_feature_available(common_config, 29)) {
-		set_feature(common_config, 29);
+	if (is_feature_available(virtio_block_device->common_config, 29)) {
+		set_feature(virtio_block_device->common_config, 29);
 	}
-	if (is_feature_available(common_config, 32)) {
-		set_feature(common_config, 32);
+	if (is_feature_available(virtio_block_device->common_config, 32)) {
+		set_feature(virtio_block_device->common_config, 32);
 	}
-	common_config->device_status |= DEVICE_FEATURES_OK;
+	virtio_block_device->common_config->device_status |= DEVICE_FEATURES_OK;
 
-	common_config->driver_feature_select = 0;
-	common_config->device_feature_select = 0;
+	virtio_block_device->common_config->driver_feature_select = 0;
+	virtio_block_device->common_config->device_feature_select = 0;
 	printf("dev_feaures_select: %b\n",
-	       (uint64_t)common_config->device_feature_select);
-	printf("dev_feaures: %b\n", (uint16_t)common_config->device_feature);
+	       virtio_block_device->common_config->device_feature_select);
+	printf("dev_feaures: %b\n",
+	       virtio_block_device->common_config->device_feature);
 	printf("drv_feaures_select: %b\n",
-	       (uint64_t)common_config->driver_feature_select);
-	printf("drv_feaures: %b\n", (uint16_t)common_config->driver_feature);
-	print_features(common_config);
+	       virtio_block_device->common_config->driver_feature_select);
+	printf("drv_feaures: %b\n",
+	       virtio_block_device->common_config->driver_feature);
+	print_features(virtio_block_device->common_config);
 
-	if (common_config->device_status & DEVICE_FAILED) {
+	if (virtio_block_device->common_config->device_status & DEVICE_FAILED) {
 		printf("failed\n");
 		hcf();
 	}
 
-	printf("size: %uMiB\ncylinders: %u\nheads: %u\nsectors: %u\nblk_size: "
+	printf("size: %luMiB\ncylinders: %u\nheads: %u\nsectors: %u\nblk_size: "
 	       "%uB\nqueues: %u\n",
-	       (device_config->capacity * 512) / 1024 / 1024,
-	       device_config->geometry.cylinders, device_config->geometry.heads,
-	       device_config->geometry.sectors, device_config->blk_size,
-	       device_config->num_queues);
+	       (virtio_block_device->device_config->capacity * 512) / 1024 / 1024,
+	       virtio_block_device->device_config->geometry.cylinders,
+	       virtio_block_device->device_config->geometry.heads,
+	       virtio_block_device->device_config->geometry.sectors,
+	       virtio_block_device->device_config->blk_size,
+	       virtio_block_device->device_config->num_queues);
 
-	VirtQueue *virt_queue = create_virtqueue(common_config, 0);
-	common_config->device_status |= 4;
+	VirtQueue *virt_queue = create_virtqueue(
+		virtio_block_pci_device, virtio_block_device->notify_config,
+		virtio_block_device->common_config, 0);
+	klist_add_tail(&virtio_block_device->virt_queues, &virt_queue->list);
+	virtio_block_device->common_config->device_status |= 4;
+
+	Disk *disk = (Disk *)kzalloc(sizeof(Disk));
+	disk->owner = virtio_block_device;
+	disk->sector_size = 512;
+	disk->size_in_sectors = virtio_block_device->device_config->capacity;
+	disk->file_ops = virtio_blk_fops;
+	klist_init(&disk->siblings);
+	klist_add_tail(&disk_list, &disk->global);
+
+	return 0;
 	// FIXME: remove the code for real use
-	uint64_t request_size = sizeof(VirtioBlkReq);
+
+	/*uint32_t request_size = sizeof(VirtioBlkReq);
 	VirtioBlkReq *data = (VirtioBlkReq *)kzalloc(request_size + 513);
 	data->sector = 0;
 	uint64_t base_phys = (uint64_t)data - hhdm_request.response->offset;
-	virt_queue->descriptor_table->address = base_phys;
-	virt_queue->descriptor_table->length = request_size;
-	virt_queue->descriptor_table->flags = 1;
-	virt_queue->descriptor_table->next = 1;
 
-	virt_queue->descriptor_table[1].address = base_phys + sizeof(VirtioBlkReq);
-	virt_queue->descriptor_table[1].length = 512;
-	virt_queue->descriptor_table[1].flags = 3;
-	virt_queue->descriptor_table[1].next = 2;
+	VirtQueueDescriptor descriptors[3];
+	descriptors[0] = {
+	    .address = base_phys,
+	    .length = request_size,
+	    .flags = 1,
+	};
 
-	virt_queue->descriptor_table[2].address =
-		base_phys + sizeof(VirtioBlkReq) + 512;
-	virt_queue->descriptor_table[2].length = 1;
-	virt_queue->descriptor_table[2].flags = 2;
+	descriptors[1] = {
+	    .address = base_phys + sizeof(VirtioBlkReq),
+	    .length = 512,
+	    .flags = 3,
+	};
 
-	virt_queue->available_ring->ring[0] = 0;
-	__sync_synchronize();
-	virt_queue->available_ring->idx++;
-	__sync_synchronize();
+	descriptors[2] = {
+	    .address = base_phys + sizeof(VirtioBlkReq) + 512,
+	    .length = 1,
+	    .flags = 2,
+	};
+
+	virt_queue_send_chain(virt_queue, descriptors, 3);
 	// write 0 to notify
-	BarAddress addr =
-		get_address_from_bar(virtio_block_device, notify_config->cap.bar);
-	uint16_t *idx = (uint16_t *)(hhdm_request.response->offset + addr.address +
-	                             notify_config->cap.offset +
-	                             virt_queue->notify_offset *
-	                                 notify_config->notify_off_multiplier);
+	BarAddress addr = get_address_from_bar(
+	    virtio_block_pci_device, virtio_block_device->notify_config->cap.bar);
+	uint16_t *idx =
+	    (uint16_t *)(hhdm_request.response->offset + addr.address +
+	                 virtio_block_device->notify_config->cap.offset +
+	                 virt_queue->notify_offset *
+	                     virtio_block_device->notify_config
+	                         ->notify_off_multiplier);
 	*idx = 0;
 	__sync_synchronize();
 	while (virt_queue->used_ring->idx != 1)
-		;
+	    ;
 
 	uint8_t status = *((uint8_t *)data + sizeof(VirtioBlkReq) + 512);
 	uint8_t *disk_data = (uint8_t *)data + sizeof(VirtioBlkReq);
@@ -441,12 +548,32 @@ int virtio_blk_probe(PCIDevice *device) {
 
 	printf("data: \n");
 	for (uint64_t i = 0; i < 512; i += 8) {
-		printf(" 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", disk_data[i + 0],
-		       disk_data[i + 1], disk_data[i + 2], disk_data[i + 3],
-		       disk_data[i + 4], disk_data[i + 5], disk_data[i + 6],
-		       disk_data[i + 7]);
+	    printf(" 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", disk_data[i + 0],
+	           disk_data[i + 1], disk_data[i + 2], disk_data[i + 3],
+	           disk_data[i + 4], disk_data[i + 5], disk_data[i + 6],
+	           disk_data[i + 7]);
 	}
 	printf("\n");
+
+	data->sector = 2048;
+	virt_queue_send_chain(virt_queue, descriptors, 3);
+	*idx = 0;
+	__sync_synchronize();
+	while (virt_queue->used_ring->idx != 2)
+	    ;
+
+	status = *((uint8_t *)data + sizeof(VirtioBlkReq) + 512);
+
+	printf("status: 0x%x\n", (uint64_t)status);
+
+	printf("data: \n");
+	for (uint64_t i = 0; i < 512; i += 8) {
+	    printf(" 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", disk_data[i + 0],
+	           disk_data[i + 1], disk_data[i + 2], disk_data[i + 3],
+	           disk_data[i + 4], disk_data[i + 5], disk_data[i + 6],
+	           disk_data[i + 7]);
+	}
+	printf("\n"); */
 
 	return 0;
 };

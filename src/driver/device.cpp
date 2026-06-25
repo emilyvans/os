@@ -31,7 +31,7 @@ void register_driver(Driver *driver, BusType *bus) {
 		} else if (driver->probe) {
 			result = driver->probe(device);
 		}
-		if (result) {
+		if (!result) {
 			klist_add_tail(&driver->device_list, &device->list_driver);
 		} else {
 			device->active_driver = nullptr;
@@ -57,7 +57,7 @@ void register_device(Device *device, BusType *bus) {
 		} else if (driver->probe) {
 			result = driver->probe(device);
 		}
-		if (result) {
+		if (!result) {
 			klist_add_tail(&driver->device_list, &device->list_driver);
 			break;
 		} else {

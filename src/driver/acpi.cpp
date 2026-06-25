@@ -149,8 +149,8 @@ struct MCFG_allocation {
 } __attribute__((packed));
 
 void parse_MCFG(ACPISDTHeader *header) {
-	printf("entries: %u\n", ((header->Length - 8 - sizeof(ACPISDTHeader)) /
-	                         sizeof(MCFG_allocation)));
+	// printf("entries: %zu\n", ((header->Length - 8 - sizeof(ACPISDTHeader)) /
+	//                           sizeof(MCFG_allocation)));
 	MCFG_allocation *mcfg =
 		(MCFG_allocation *)(((uint64_t)header) + 8 + sizeof(ACPISDTHeader));
 
@@ -166,7 +166,6 @@ void parse_MCFG(ACPISDTHeader *header) {
 		                                   virtualmemory::Cache_disable_flag |
 		                                   virtualmemory::readwrite_flag);
 	}
-	volatile pci_header *virtio_block_device = NULL;
 	for (uint64_t bus = mcfg->start_Bus; bus <= mcfg->end_bus; bus++) {
 		for (uint16_t dev = 0; dev < 32; dev++) {
 			volatile pci_header *pci_device =

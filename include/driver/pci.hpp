@@ -91,7 +91,7 @@ struct pci_header {
 } __attribute__((packed));
 
 typedef struct pci_capability {
-	uint8_t vendor;
+	uint8_t id;
 	uint8_t next;
 } __attribute__((packed)) pci_capability;
 
@@ -132,6 +132,7 @@ typedef struct PCIDriver {
 
 void register_pci_driver(PCIDriver *driver);
 void register_pci_device(PCIDevice *device);
+void print_pci_device(volatile pci_header *pci_device, uint8_t function = 0);
 
 extern BusType pci_bus;
 
