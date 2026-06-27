@@ -5,9 +5,9 @@
 #include <stdint.h>
 
 typedef struct FileOperations_s {
-	void (*write)(struct Disk_s disk, uint64_t start_sector, void *buffer,
+	void (*write)(struct Disk_s *disk, uint64_t start_sector, void *buffer,
 	              uint64_t sector_count);
-	void (*read)(struct Disk_s disk, uint64_t start_sector, void *buffer,
+	void (*read)(struct Disk_s *disk, uint64_t start_sector, void *buffer,
 	             uint64_t sector_count);
 } FileOperations;
 

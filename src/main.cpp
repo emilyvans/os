@@ -340,11 +340,16 @@ void test() {
 	}
 
 	uint8_t *boot_sector = (uint8_t *)kalloc(512);
-	disk->file_ops.read(*disk, 0, boot_sector, 1);
+	disk->file_ops.read(disk, 0, boot_sector, 1);
 
 	MBR mbr;
 	memcpy(&mbr, boot_sector, 512);
 
+	if (mbr.partitions[0].os_type == 0xEE) {
+		UNIMPLEMENTED_NAME("GPT disks");
+		printf("only MBR disk are supported");
+		return;
+	}
 	MBRPartitionEntry boot_partition_entry = {};
 	for (uint32_t i = 0; i < 4; i++) {
 		MBRPartitionEntry entry = mbr.partitions[i];
@@ -365,7 +370,7 @@ void test() {
 	printf("----------------------------------------------------\n");
 	uint64_t fat_part_start_sector = boot_partition_entry.starting_LBA;
 	memset(boot_sector, 0, 512);
-	disk->file_ops.read(*disk, fat_part_start_sector, boot_sector, 1);
+	disk->file_ops.read(disk, fat_part_start_sector, boot_sector, 1);
 	printf("bpb data: \n");
 	for (uint64_t i = 0; i < 512; i += 8) {
 		printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
@@ -413,7 +418,7 @@ void test() {
 	uint64_t fat_start_sector =
 		fat_part_start_sector + fat_bpb.reserved_sector_count;
 
-	disk->file_ops.read(*disk, fat_start_sector, boot_sector, 1);
+	disk->file_ops.read(disk, fat_start_sector, boot_sector, 1);
 	printf("fat data(part_start + %hu): \n", fat_bpb.reserved_sector_count);
 	for (uint64_t i = 0; i < 512; i += 8) {
 		printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
@@ -428,7 +433,7 @@ void test() {
 	                       (fat_bpb.number_of_FATs * fat_size),
 	              i = 0;
 	     i < root_directory_sectors; i++, sector++) {
-		disk->file_ops.read(*disk, sector, boot_sector, 1);
+		disk->file_ops.read(disk, sector, boot_sector, 1);
 
 		printf("root dir(%lu sec): \n", sector - fat_part_start_sector);
 		for (uint64_t i = 0; i < 512; i += 8) {
@@ -439,4 +444,5 @@ void test() {
 		}
 		printf("\n");
 	}
+	printf("os_type 0x%x", boot_partition_entry.os_type);
 }

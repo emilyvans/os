@@ -9,6 +9,10 @@
 
 #define ALIGN_DOWN(A, B) ((A / B) * B)
 
+#define UNIMPLEMENTED_NAME(name)                                               \
+	printf("\033[1;1;1;1;31mnot implemented: %s\033[0m\n", name)
+#define UNIMPLEMENTED() UNIMPLEMENTED_NAME(__func__)
+
 extern "C" void *memcpy(void *__restrict dest, const void *__restrict src,
                         size_t count);
 

@@ -52,7 +52,8 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND sgdisk ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd -n 1:2048 -t 1:ef00 -m 1
 	COMMAND make -C ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine
 	COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine bios-install
-		${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
+		${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd 1
+	#COMMAND sgdisk -g ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND mformat -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
 	COMMAND mmd -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine ::/longname ::/realylongname ::/extremelylongname
 	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M

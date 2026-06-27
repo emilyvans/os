@@ -138,7 +138,19 @@ uint64_t strlen(const char *str) {
 void vprintf(const char *fmt, va_list arg_list) {
 	uint64_t length = strlen(fmt);
 	for (uint64_t i = 0; i < length; i++) {
-		if (fmt[i] != '%') {
+		if (fmt[i] == '\033' && fmt[i + 1] == '[') {
+			uart_send('\033');
+			uart_send('[');
+			i += 2;
+			if (i < length) {
+				while (i < length && !(0x40 <= fmt[i] && fmt[i] <= 0x7E)) {
+					uart_send(fmt[i]);
+					i++;
+				}
+			}
+			uart_send(fmt[i]);
+			continue;
+		} else if (fmt[i] != '%') {
 			put_char(fmt[i]);
 			continue;
 		}

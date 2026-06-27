@@ -199,9 +199,9 @@ uint16_t virt_queue_send_chain(VirtQueue *virt_queue,
 	return index;
 }
 
-void virtio_blk_read(Disk disk, uint64_t start_sector, void *buffer,
+void virtio_blk_read(Disk *disk, uint64_t start_sector, void *buffer,
                      uint64_t sector_count) {
-	VirtioBlk *device = (VirtioBlk *)disk.owner;
+	VirtioBlk *device = (VirtioBlk *)disk->owner;
 	if (buffer == nullptr || sector_count == 0 || device == nullptr)
 		return;
 
@@ -312,11 +312,12 @@ done:
 	return;
 }
 
-void virtio_blk_write(Disk disk, uint64_t start_sector, void *buffer,
+void virtio_blk_write(Disk *disk, uint64_t start_sector, void *buffer,
                       uint64_t sector_count) {
-	VirtioBlk *device = (VirtioBlk *)disk.owner;
+	VirtioBlk *device = (VirtioBlk *)disk->owner;
 	if (buffer == nullptr && sector_count == 0 && device == nullptr)
 		return;
+	UNIMPLEMENTED();
 }
 
 FileOperations virtio_blk_fops = {
