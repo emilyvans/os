@@ -195,10 +195,6 @@ extern "C" void kmain(void) {
 	physicalmemory::initialize();
 	virtualmemory::initialize();
 
-	printf("total Memory: %luMiB\nfree memory:  %luMiB\n",
-	       physicalmemory::get_total_ram() / 1024 / 1024,
-	       physicalmemory::get_free_ram() / 1024 / 1024);
-
 // ps2_keyboard_get_current_keyset();
 // ps2_flush_keycode_buffer();
 #if 1
@@ -234,13 +230,22 @@ extern "C" void kmain(void) {
 
 	// PIC_unmask_interrupt(11);
 
-	register_pci_driver(&virtio_blk_drv);
 	clear_console();
 	printf("total Memory: %luMiB\nfree memory:  %luMiB\n",
 	       physicalmemory::get_total_ram() / 1024 / 1024,
 	       physicalmemory::get_free_ram() / 1024 / 1024);
+	register_pci_driver(&virtio_blk_drv);
 
-	test();
+	printf(
+		"disk: " UUID_FORMAT_STRING ", part:" UUID_FORMAT_STRING "\n\n",
+		UUID_PRINTF_ARGS(
+			executable_file_request.response->executable_file->gpt_disk_uuid),
+		UUID_PRINTF_ARGS(
+			executable_file_request.response->executable_file->gpt_part_uuid));
+
+	printf("\"%09.4d\"\n", 60);
+
+	// test();
 
 	//  convert this to a non busy-loop
 	for (;;) {

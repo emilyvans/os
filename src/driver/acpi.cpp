@@ -64,6 +64,7 @@ void init_ACPI() {
 			// ignore vm helper table for windows vmsi
 		}
 	}
+	printf("\n");
 }
 
 void display_BGRT(BGRT *bgrt) {

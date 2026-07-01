@@ -154,15 +154,6 @@ VirtQueue *create_virtqueue(volatile pci_header *pci_device,
 
 	cfg->queue_enable = 1;
 	__sync_synchronize();
-
-	printf(
-		"sel: %u, size: %u, msix: %u, enable: %u, notify offset: %u, desc: "
-		"0x%lx, driver: 0x%lx, device: 0x%lx, desc_size: %lu, avail_size: %lu, "
-		"used_size: %lu, status: %b, fail: %b \n",
-		cfg->queue_select, cfg->queue_size, cfg->queue_msix_vector,
-		cfg->queue_enable, cfg->queue_notify_off, cfg->queue_desc,
-		cfg->queue_driver, cfg->queue_device, descriptor_table_size,
-		available_ring_size, used_ring_size, cfg->device_status, 128);
 	return virt_queue;
 }
 
@@ -320,7 +311,7 @@ void virtio_blk_write(Disk *disk, uint64_t start_sector, void *buffer,
 	UNIMPLEMENTED();
 }
 
-FileOperations virtio_blk_fops = {
+DiskOperations virtio_blk_dops = {
 	.read = &virtio_blk_read,
 	.write = &virtio_blk_write,
 };
@@ -333,17 +324,13 @@ int virtio_blk_probe(PCIDevice *device) {
 	virtio_block_device->pci_device = device;
 	klist_init(&virtio_block_device->virt_queues);
 
-	print_pci_device(virtio_block_pci_device);
-
 	pci_capability *capability =
 		(pci_capability
 	         *)((uint64_t)virtio_block_pci_device +
 	            (virtio_block_pci_device->type_0.capabilities_pointer & ~0x3));
 	// 64-bit bar 4: bar5[63:32] bar4[31:0]
 	bool mapped_bar[] = {false, false, false, false, false};
-	printf("------------------------------------\n");
 	while (capability != nullptr) {
-		printf("address: 0x%p\n", capability);
 		if (capability->id == 0x9) {
 			VirtioPciCapability *virtio_capability =
 				(VirtioPciCapability *)capability;
@@ -351,21 +338,7 @@ int virtio_blk_probe(PCIDevice *device) {
 			BarAddress addr = get_address_from_bar(virtio_block_pci_device,
 			                                       virtio_capability->bar);
 
-			printf("addr: 0x%lx, type: %s, size: 0x%lx\n",
-			       addr.address + virtio_capability->offset,
-			       addr.is_memory_space ? "memory" : "I/O", addr.size);
-
 			if (addr.is_memory_space) {
-				printf(
-					"vendor: 0x%x\nnext: 0x%x\nlength: 0x%x\nconfig_type: "
-					"0x%x\nbar: 0x%x\nid: 0x%x\noffset: 0x%x\nstruct_length: "
-					"0x%x\n",
-					virtio_capability->capability.id,
-					virtio_capability->capability.next,
-					virtio_capability->length, virtio_capability->config_type,
-					virtio_capability->bar, virtio_capability->id,
-					virtio_capability->offset,
-					virtio_capability->struct_length);
 
 				if (!mapped_bar[virtio_capability->bar]) {
 					for (uint64_t offset = 0; offset < addr.size;
@@ -406,10 +379,7 @@ int virtio_blk_probe(PCIDevice *device) {
 					                hhdm_request.response->offset);
 				}
 			}
-		} else {
-			printf("id: 0x%x next: 0x%x\n", capability->id, capability->next);
 		}
-		printf("------------------------------------\n");
 		if (capability->next == 0)
 			break;
 
@@ -432,15 +402,6 @@ int virtio_blk_probe(PCIDevice *device) {
 
 	virtio_block_device->common_config->driver_feature_select = 0;
 	virtio_block_device->common_config->device_feature_select = 0;
-	printf("dev_feaures_select: %b\n",
-	       virtio_block_device->common_config->device_feature_select);
-	printf("dev_feaures: %b\n",
-	       virtio_block_device->common_config->device_feature);
-	printf("drv_feaures_select: %b\n",
-	       virtio_block_device->common_config->driver_feature_select);
-	printf("drv_feaures: %b\n",
-	       virtio_block_device->common_config->driver_feature);
-	print_features(virtio_block_device->common_config);
 	// SEG_MAX(2) GEOMETRY(4) BLK_SIZE(6) EVENT_IDX(29) VERSION_1(32)
 
 	if (is_feature_available(virtio_block_device->common_config, 2)) {
@@ -462,29 +423,11 @@ int virtio_blk_probe(PCIDevice *device) {
 
 	virtio_block_device->common_config->driver_feature_select = 0;
 	virtio_block_device->common_config->device_feature_select = 0;
-	printf("dev_feaures_select: %b\n",
-	       virtio_block_device->common_config->device_feature_select);
-	printf("dev_feaures: %b\n",
-	       virtio_block_device->common_config->device_feature);
-	printf("drv_feaures_select: %b\n",
-	       virtio_block_device->common_config->driver_feature_select);
-	printf("drv_feaures: %b\n",
-	       virtio_block_device->common_config->driver_feature);
-	print_features(virtio_block_device->common_config);
 
 	if (virtio_block_device->common_config->device_status & DEVICE_FAILED) {
 		printf("failed\n");
 		hcf();
 	}
-
-	printf("size: %luMiB\ncylinders: %u\nheads: %u\nsectors: %u\nblk_size: "
-	       "%uB\nqueues: %u\n",
-	       (virtio_block_device->device_config->capacity * 512) / 1024 / 1024,
-	       virtio_block_device->device_config->geometry.cylinders,
-	       virtio_block_device->device_config->geometry.heads,
-	       virtio_block_device->device_config->geometry.sectors,
-	       virtio_block_device->device_config->blk_size,
-	       virtio_block_device->device_config->num_queues);
 
 	VirtQueue *virt_queue = create_virtqueue(
 		virtio_block_pci_device, virtio_block_device->notify_config,
@@ -496,7 +439,7 @@ int virtio_blk_probe(PCIDevice *device) {
 	disk->owner = virtio_block_device;
 	disk->sector_size = 512;
 	disk->size_in_sectors = virtio_block_device->device_config->capacity;
-	disk->file_ops = virtio_blk_fops;
+	disk->disk_ops = virtio_blk_dops;
 	klist_init(&disk->siblings);
 	klist_add_tail(&disk_list, &disk->global);
 

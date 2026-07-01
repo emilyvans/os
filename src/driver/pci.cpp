@@ -12,7 +12,6 @@ void register_pci_device(PCIDevice *device) {
 }
 
 int PCI_PROBE(Device *dev) {
-	printf("PCI probe\n");
 	PCIDevice *pci_dev = container_of(dev, PCIDevice, device);
 	PCIDriver *pci_drv =
 		container_of(pci_dev->device.active_driver, PCIDriver, driver);

@@ -5,11 +5,11 @@ typedef struct KListHead {
 	struct KListHead *next, *prev;
 } KListHead;
 
-#define KLIST_DEFINE(name) KListHead name = {&name, &name};
+#define KLIST_DEFINE(name) KListHead name = {&name, &name}
 
-#define KLIST_FOREACH(list_head)                                               \
-	for (KListHead *head = (list_head)->next; head != (list_head);             \
-	     head = head->next)
+#define KLIST_FOREACH(list_head, name)                                         \
+	for (KListHead *name = (list_head)->next; name != (list_head);             \
+	     name = name->next)
 
 // void klist_add_tail(klist_head *list_head, klist_head *list_tail);
 

@@ -49,12 +49,12 @@ target_compile_options(myos PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${COMMON_FLAGS}>)
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND ${CMAKE_COMMAND} -E rm -f -- ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND dd if=/dev/null bs=1M count=0 seek=512 of=${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
-	COMMAND sgdisk ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd -n 1:2048 -t 1:ef00 -m 1
+	#COMMAND sgdisk ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd -n 1:0 -t 1:ef00 -m 1
+	COMMAND sgdisk ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd -n 1:2048:+2M -t 1:ef02 -n 2:0 -t 2:ef00
 	COMMAND make -C ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine
 	COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine bios-install
 		${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd 1
-	#COMMAND sgdisk -g ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
-	COMMAND mformat -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
+	COMMAND mformat -v OS -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
 	COMMAND mmd -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine ::/longname ::/realylongname ::/extremelylongname
 	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
 		${CMAKE_CURRENT_SOURCE_DIR}/limine.conf
