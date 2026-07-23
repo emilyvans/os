@@ -321,7 +321,7 @@ void vprintf(const char *fmt, va_list arg_list) {
 				length = state.precision;
 			}
 			uint64_t padding =
-				(state.width - length) > 0 ? (state.width - length) : 0;
+				int64_t(state.width - length) > 0 ? (state.width - length) : 0;
 			for (uint64_t j = 0;
 			     j < padding && !(state.flags & LEFT_ALIGNED_FLAG); j++) {
 				put_char(' ');
@@ -362,7 +362,7 @@ void vprintf(const char *fmt, va_list arg_list) {
 			state.is_number = true;
 			state.radix = 2;
 			if (state.flags & ALTERNATE_FLAG) {
-				put_char(0);
+				put_char('0');
 				put_char('b');
 			}
 		} break;
@@ -370,7 +370,7 @@ void vprintf(const char *fmt, va_list arg_list) {
 			state.is_number = true;
 			state.radix = 16;
 			if (state.flags & ALTERNATE_FLAG) {
-				put_char(0);
+				put_char('0');
 				put_char('x');
 			}
 		} break;

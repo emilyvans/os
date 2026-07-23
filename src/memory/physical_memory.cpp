@@ -1,49 +1,37 @@
 #include "memory/physical_memory.hpp"
 #include "driver/console.hpp"
 #include "limine/limine_requests.hpp"
+#include "list/klist.hpp"
 #include "panic.hpp"
 #include "utils.hpp"
 #include <limine.h>
 #include <stdint.h>
 
-typedef struct Bitmap {
-	bool operator[](uint64_t index) { return get(index); }
+bool Bitmap::get(uint64_t index) {
+	uint64_t byte_index = index >> 3; // /8
+	uint8_t bit_index = index & 0x7;  // % 8
+	return buffer[byte_index] & (0x1 << bit_index);
+}
 
-	bool get(uint64_t index) {
-		uint64_t byte_index = index >> 3; // /8
-		uint8_t bit_index = index & 0x7;  // % 8
-		return buffer[byte_index] & (0x1 << bit_index);
+void Bitmap::set(uint64_t index, bool value) {
+	if (value) {
+		set(index);
+	} else {
+		reset(index);
 	}
+}
 
-	void set(uint64_t index, bool value) {
-		if (value) {
-			set(index);
-		} else {
-			reset(index);
-		}
-	}
+void Bitmap::set(uint64_t index) {
+	uint64_t byte_index = index >> 3; // /8
+	uint8_t bit_index = index & 0x7;  // % 8
+	buffer[byte_index] |= 0x1 << bit_index;
+}
 
-	void set(uint64_t index) {
-		uint64_t byte_index = index >> 3; // /8
-		uint8_t bit_index = index & 0x7;  // % 8
-		buffer[byte_index] |= 0x1 << bit_index;
-	}
-
-	void reset(uint64_t index) {
-		uint64_t byte_index = index >> 3; // /8
-		uint8_t bit_index = index & 0x7;  // % 8
-		buffer[byte_index] &= ~(1 << bit_index);
-	}
-
-	uint64_t get_length() { return bit_length; }
-
-private:
-	uint8_t *buffer;
-	uint64_t byte_length;
-	uint64_t bit_length;
-	friend void physicalmemory::initialize();
-	friend uint64_t get_bitmap_base();
-} Bitmap;
+void Bitmap::reset(uint64_t index) {
+	uint64_t byte_index = index >> 3; // /8
+	uint8_t bit_index = index & 0x7;  // % 8
+	buffer[byte_index] &= ~(1 << bit_index);
+}
 /*
 // maybe use later
 typedef struct Bintree {
@@ -52,11 +40,6 @@ typedef struct Bintree {
     Bintree *right;
 } Bintree;
 */
-
-typedef struct MemoryRegion {
-	uint64_t start;
-	Bitmap bitmap;
-} MemoryRegion;
 
 uint64_t memory_region_count = 0;
 MemoryRegion *memory_regions = NULL;
@@ -88,20 +71,25 @@ void physicalmemory::initialize() {
 	limine_hhdm_response *hhdm_response = hhdm_request.response;
 	limine_memmap_response *memmap_response = memmap_request.response;
 	uint64_t total_size = 0;
+	uint64_t total_page_count = 0;
 	for (uint64_t i = 0; i < memmap_response->entry_count; i++) {
 		limine_memmap_entry *entry = memmap_response->entries[i];
 		if (entry->type == LIMINE_MEMMAP_USABLE) {
 			uint64_t page_count = DIV_ROUNDUP(entry->length, 4096);
 			total_size += (DIV_ROUNDUP(page_count, 8) + sizeof(MemoryRegion));
+			total_size += page_count * sizeof(Page);
+			total_page_count += page_count;
 			memory_region_count++;
 			// printf("start: 0x%lx, size 0x%lx, type: 0x%lx\n", entry->base,
 			//        entry->length, entry->type);
+			//
 		}
 	}
 
 	total_size = ALIGN_UP(total_size, 4096);
 
 	void *bitmaps_start = NULL;
+	void *page_arrays_start = NULL;
 	for (uint64_t i = 0; i < memmap_response->entry_count; i++) {
 		limine_memmap_entry *entry = memmap_response->entries[i];
 		if (entry->type == LIMINE_MEMMAP_USABLE) {
@@ -109,6 +97,10 @@ void physicalmemory::initialize() {
 				void *start = (void *)(entry->base + entry->length -
 				                       total_size + hhdm_response->offset);
 				bitmaps_start =
+					(void *)((uint64_t)start +
+				             (sizeof(MemoryRegion) * memory_region_count) +
+				             (sizeof(Page) * total_page_count));
+				page_arrays_start =
 					(void *)((uint64_t)start +
 				             (sizeof(MemoryRegion) * memory_region_count));
 				memory_regions = (MemoryRegion *)start;
@@ -118,14 +110,24 @@ void physicalmemory::initialize() {
 
 	memset(memory_regions, 0, total_size);
 
-	for (uint64_t i = 0, j = 0, current_map_ptr = (uint64_t)bitmaps_start;
+	for (uint64_t i = 0, j = 0, current_map_ptr = (uint64_t)bitmaps_start,
+	              current_array_ptr = (uint64_t)page_arrays_start;
 	     i < memmap_response->entry_count; i++) {
 		limine_memmap_entry *entry = memmap_response->entries[i];
 		if (entry->type == LIMINE_MEMMAP_USABLE) {
 			uint64_t page_count = DIV_ROUNDUP(entry->length, 4096);
 			uint64_t size = DIV_ROUNDUP(page_count, 8);
+			uint64_t end = entry->base + entry->length;
 			MemoryRegion *region = memory_regions + j;
 			region->start = entry->base;
+			region->pages.count = page_count;
+			region->pages.data = (Page *)current_array_ptr;
+			for (uint64_t page = entry->base, page_index = 0; page < end;
+			     page += 0x1000, page_index++) {
+				uint64_t page_addr = page >> 12;
+				region->pages.data[page_index].address = page_addr;
+				region->pages.data[page_index].type = PageTypeNone;
+			};
 			region->bitmap.byte_length = size;
 			region->bitmap.bit_length = page_count;
 			region->bitmap.buffer = (uint8_t *)current_map_ptr;
@@ -133,6 +135,7 @@ void physicalmemory::initialize() {
 				region->bitmap.set(0);
 			}
 			current_map_ptr += size;
+			current_array_ptr += page_count * sizeof(Page);
 			j++;
 		}
 	}
@@ -153,7 +156,8 @@ void physicalmemory::initialize() {
 	}
 }
 
-PhysicalAddress physicalmemory::kalloc(uint64_t pages) {
+#define debug 0
+PhysicalAddress physicalmemory::kalloc(uint64_t pages, uint64_t alignment) {
 	if (pages == 0) {
 		printf("zero page alloc");
 		hcf();
@@ -162,21 +166,47 @@ PhysicalAddress physicalmemory::kalloc(uint64_t pages) {
 
 	for (uint64_t i = 0; i < memory_region_count; i++) {
 		uint64_t count = 0;
+		uint64_t start = 0;
+		uint64_t increment = alignment;
 		MemoryRegion *region = memory_regions + i;
-		for (uint64_t j = 0; j < region->bitmap.get_length(); j++) {
+		uint64_t aligned_start_address =
+			ALIGN_UP(region->start, 4096 * alignment);
+		for (uint64_t j = (aligned_start_address - region->start) / 4096;
+		     j < region->bitmap.get_length(); j += increment) {
 			if (!region->bitmap[j]) {
+				if (count == 0) {
+					start = j;
+#if debug
+					if (alignment != 1)
+						printf("index j : %lu\n", j);
+#endif
+				}
+				increment = 1;
 				count++;
 				if (count == pages) {
-					for (uint64_t index = count; index > 0; index--) {
-						region->bitmap.set(j - index + 1);
+					for (int64_t index = start; index < (start + count);
+					     index++) {
+						region->bitmap.set(index);
+#if debug
+						if (alignment != 1)
+							printf("index: %lu\n", index);
+#endif
 					}
-					// printf("alloc: 0x%x, size: 0x%x\n",
-					//        region->start + ((j - count + 1) * 4096),
-					//        pages * 4096);
-					return region->start + ((j - count + 1) * 4096);
+#if debug
+					if (alignment != 1) {
+						printf("alloc: %#lx, size: %#lx, alignment: %lu, j: "
+						       "%lu, count : %lu, mod4pages: %lu\n",
+						       region->start + (start * 4096), pages * 4096,
+						       alignment, j, count,
+						       (region->start + (start * 4096)) % (4 * 4096));
+					}
+#endif
+
+					return region->start + (start * 4096);
 				}
 			} else {
 				count = 0;
+				increment = alignment;
 			}
 		}
 	}

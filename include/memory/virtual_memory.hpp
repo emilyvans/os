@@ -74,7 +74,7 @@ void swap_to_kernel_pagemap();
 
 } // namespace virtualmemory
 
-void *page_alloc(uint64_t pages);
+void *page_alloc(uint64_t pages, uint64_t alignment = 1);
 void free_pages(void *start, uint64_t pages);
 void *kalloc(uint64_t bytes);
 void *kzalloc(uint64_t bytes);

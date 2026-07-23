@@ -10,9 +10,11 @@ void hcf(void) {
 }
 
 void panic(const char *fmt, ...) {
-	printf("PANIC: ");
+	printf("\033[1;31mPANIC: ");
 	va_list args;
 	va_start(args, fmt);
 	vprintf(fmt, args);
 	va_end(args);
+	printf("\033[0m");
+	hcf();
 }

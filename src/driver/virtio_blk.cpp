@@ -441,7 +441,8 @@ int virtio_blk_probe(PCIDevice *device) {
 	disk->size_in_sectors = virtio_block_device->device_config->capacity;
 	disk->disk_ops = virtio_blk_dops;
 	klist_init(&disk->siblings);
-	klist_add_tail(&disk_list, &disk->global);
+
+	register_disk(disk);
 
 	return 0;
 	// FIXME: remove the code for real use

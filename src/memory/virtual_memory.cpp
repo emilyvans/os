@@ -8,8 +8,25 @@
 #include <limine.h>
 #include <stdint.h>
 
+extern uint64_t memory_region_count;
+extern MemoryRegion *memory_regions;
+
 uint64_t kernel_map = 0;
 uint64_t current_map = 0;
+
+Page *get_page_from_address(void *ptr_address) {
+	PhysicalAddress address =
+		((uint64_t)ptr_address & ~(0xfff)) - hhdm_request.response->offset;
+	for (uint64_t i = 0; i < memory_region_count; i++) {
+		MemoryRegion *region = memory_regions + i;
+		uint64_t end = region->start + (region->pages.count * 0x1000);
+		if (address > end || region->start > address)
+			continue;
+		uint64_t index = (address - region->start) >> 12;
+		return region->pages.data + index;
+	}
+	return NULL;
+}
 
 void clear_page(PhysicalAddress physical_address) {
 	uint64_t address = physical_address + hhdm_request.response->offset;
@@ -20,8 +37,8 @@ void clear_page(PhysicalAddress physical_address) {
 	}
 }
 
-void *page_alloc(uint64_t pages) {
-	uint64_t addr = physicalmemory::kalloc(pages);
+void *page_alloc(uint64_t pages, uint64_t alignment) {
+	uint64_t addr = physicalmemory::kalloc(pages, alignment);
 	if (addr == NULL) {
 		return NULL;
 	}
@@ -67,7 +84,14 @@ uint64_t size;
 uint64_t slab_availible_space = ((SLAB_PAGES * 4096) - sizeof(Slab));
 
 Slab *alloc_slab(uint64_t obj_size) {
-	void *pages = page_alloc(SLAB_PAGES);
+	void *pages = page_alloc(SLAB_PAGES, SLAB_PAGES);
+
+	Page *first_page = get_page_from_address(pages);
+
+	for (uint64_t i = 0; i < SLAB_PAGES; i++) {
+		(first_page + i)->type = PageTypeSlab;
+	}
+
 	uint64_t object_offset = slab_availible_space % obj_size;
 	uint64_t object_count = slab_availible_space / obj_size;
 	Slab *slab = (Slab *)pages;
@@ -93,13 +117,17 @@ Slab *alloc_slab(uint64_t obj_size) {
 
 void free_slab(Slab *slab) {
 	free_pages(slab, SLAB_PAGES);
+	Page *first_page = get_page_from_address(slab);
+	for (uint64_t i = 0; i < SLAB_PAGES; i++) {
+		(first_page + i)->type = PageTypeNone;
+	}
 }
 
-// 8 16 32 64 128 256 512 1024 2048
-#define KMEM_CACHE_COUNT 9
+// 32 64 128 256 512 1024 2048
+#define KMEM_CACHE_COUNT 8
 Cache kmem_cache[KMEM_CACHE_COUNT];
-uint64_t kmem_cache_sizes[KMEM_CACHE_COUNT] = {8,   16,  32,   64,  128,
-                                               256, 512, 1024, 2048};
+uint64_t kmem_cache_sizes[KMEM_CACHE_COUNT] = {32,  64,   128,  256,
+                                               512, 1024, 2048, 4096};
 
 void kalloc_init() {
 	for (uint64_t i = 0; i < KMEM_CACHE_COUNT; i++) {
@@ -112,6 +140,16 @@ void kalloc_init() {
 }
 
 void *kalloc(uint64_t bytes) {
+	if (bytes > kmem_cache_sizes[KMEM_CACHE_COUNT - 1]) {
+		uint64_t pages = DIV_ROUNDUP(bytes, 4096);
+		void *address = page_alloc(pages);
+		Page *page = get_page_from_address(address);
+		for (uint64_t i = 0; i < pages; i++) {
+			Page *current_page = page + i;
+			current_page->data = pages - i;
+		}
+		return address;
+	}
 	Cache *selected_cache = nullptr;
 	for (uint64_t i = 0; i < KMEM_CACHE_COUNT; i++) {
 		Cache *cache = &kmem_cache[i];
@@ -157,7 +195,27 @@ void *kalloc(uint64_t bytes) {
 }
 
 void kfree(void *ptr) {
-	Slab *slab = (Slab *)((uintptr_t)ptr & ~((4096 * SLAB_PAGES) - 1));
+	Page *page = get_page_from_address(ptr);
+	if (page->type == PageTypeNone) {
+		Page *current_page = page;
+		while (current_page->data < (current_page - 1)->data) {
+			current_page = current_page - 1;
+		}
+		free_pages((void *)current_page->address, current_page->data - 1);
+	} else if (page->type == PageTypeSlab) {
+		Slab *slab = (Slab *)((uintptr_t)ptr & ~((4096 * SLAB_PAGES) - 1));
+		FreeList *base_address =
+			(FreeList *)(((uint64_t)ptr / slab->object_size) *
+		                 slab->object_size);
+		slab->free_count++;
+		base_address->next = slab->free_list;
+		slab->free_list = base_address;
+		/* FIXME:
+		 * move slab from full to partial when it was full
+		 * move slab from partial to free when it is empty
+		 * TODO:free slab if empty and not use for a time
+		 */
+	}
 }
 
 void *kzalloc(uint64_t bytes) {
@@ -280,6 +338,9 @@ void virtualmemory::map_page(uint64_t root_physical, uint64_t virtual_address,
 		PhysicalAddress table =
 			physicalmemory::kalloc(sizeof(PageDirectoryPointerTable) / 4096);
 		clear_page(table);
+		if (table == NULL) {
+			printf("null1");
+		}
 		uint64_t entry = (uint64_t)table & address_mask;
 		root->PML4E[pml4_index] = entry | upper_flags;
 	}
@@ -293,6 +354,9 @@ void virtualmemory::map_page(uint64_t root_physical, uint64_t virtual_address,
 		clear_page(directory);
 		uint64_t entry = (uint64_t)directory & address_mask;
 		pdpt->PDPTE[pdpt_index] = entry | upper_flags;
+		if (directory == NULL) {
+			printf("null2");
+		}
 	}
 
 	PageDirectory *page_directory =
@@ -303,6 +367,9 @@ void virtualmemory::map_page(uint64_t root_physical, uint64_t virtual_address,
 		PhysicalAddress table =
 			physicalmemory::kalloc(sizeof(PageTable) / 4096);
 		clear_page(table);
+		if (table == NULL) {
+			printf("null3");
+		}
 		uint64_t entry = (uint64_t)table & address_mask;
 		page_directory->PDE[pd_index] = entry | upper_flags;
 	}

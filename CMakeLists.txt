@@ -34,7 +34,8 @@ set(SOURCES
 	./src/driver/pci.cpp
 	./src/list/klist.cpp
 	./src/driver/virtio_blk.cpp
-	./src/disk.cpp
+	./src/driver/disk.cpp
+	./src/driver/fs/ext.cpp
 )
 
 add_executable(myos ${SOURCES})
@@ -49,7 +50,7 @@ target_compile_options(myos PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${COMMON_FLAGS}>)
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND ${CMAKE_COMMAND} -E rm -f -- ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND dd if=/dev/null bs=1M count=0 seek=512 of=${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
-	#COMMAND sgdisk ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd -n 1:0 -t 1:ef00 -m 1
+	#COMMAND sgdisk ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd -n 1:0 -t 1:ef00 -u 1 -m 1
 	COMMAND sgdisk ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd -n 1:2048:+2M -t 1:ef02 -n 2:0 -t 2:ef00
 	COMMAND make -C ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine
 	COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine bios-install

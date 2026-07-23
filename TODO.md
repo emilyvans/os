@@ -3,10 +3,11 @@
     - only keyset 1 working for now
 - [x] basic UART support
 - [x] basic memory management
-- [ ] PCI-e driver
+- [X] PCI-e driver
 - [ ] disk driver
+- [ ] fat32 driver
 - [ ] ELF loader
+- [ ] scheduler
 - [ ] system calls with interrupt 50
 - [ ] a basic shell
-- [ ] scheduler
 - [ ] audio driver

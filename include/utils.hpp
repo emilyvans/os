@@ -3,11 +3,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define DIV_ROUNDUP(A, B) ((A + (B - 1)) / B)
+#define DIV_ROUNDUP(A, B) (((A) + ((B) - 1)) / (B))
 
-#define ALIGN_UP(A, B) (DIV_ROUNDUP(A, B) * B)
+#define ALIGN_UP(A, B) (DIV_ROUNDUP(A, B) * (B))
 
-#define ALIGN_DOWN(A, B) ((A / B) * B)
+#define ALIGN_DOWN(A, B) (((A) / (B)) * (B))
 
 #define UNIMPLEMENTED_NAME(name)                                               \
 	printf("\033[1;1;1;1;31mnot implemented: %s\033[0m\n", name)

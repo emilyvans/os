@@ -5,6 +5,7 @@
 #include "driver/acpi.hpp"
 #include "driver/console.hpp"
 #include "driver/device.hpp"
+#include "driver/fs/ext.hpp"
 #include "driver/init.hpp"
 #include "driver/keyboard/keyboard.hpp"
 #include "driver/pci.hpp"
@@ -13,10 +14,10 @@
 #include "driver/virtio_blk.hpp"
 #include "limine/limine_requests.hpp"
 #include "list/container_of.hpp"
+#include "list/klist.hpp"
 #include "memory/physical_memory.hpp"
 #include "memory/virtual_memory.hpp"
 #include "panic.hpp"
-#include "programs/shell.hpp"
 #include "stdbool.h"
 #include "stddef.h"
 #include "utils.hpp"
@@ -62,10 +63,22 @@ void double_fault_handler(InterruptFrame *frame) {
 	hcf();
 }
 void gp_handler(InterruptFrame *frame) {
-	(void)frame; // to remove warning
 	// clear_console();
-	printf("general protation\nRIP=%lx CS=%lx RFLAGS=%lx\nerror=%lb\n",
+	printf("general protation\nRIP=%#zx CS=%#zx RFLAGS=%#zx\nerror=%lb\n",
 	       frame->rip, frame->cs, frame->flags, frame->error_code);
+	printf(
+		"InterruptFrame: "
+		"r15=%#zx\nr14=%#zx\nr13=%#zx\nr12=%#zx\nr11=%#zx\nr10=%#zx\nr9=%#"
+		"zx\nr8=%#zx\n"
+		"rbp=%#zx\nrdi=%#zx\nrsi=%#zx\nrdx=%#zx\nrcx=%#zx\nrbx=%#zx\nrax=%#zx\n"
+		"interrupt_nr=%#zx\nsp=%#zx\n"
+		"ss=%#zx\n",
+		frame->r15, frame->r14, frame->r13, frame->r12, frame->r11, frame->r10,
+		frame->r9, frame->r8, frame->rbp, frame->rdi, frame->rsi, frame->rdx,
+		frame->rcx, frame->rbx, frame->rax, frame->interupt_nr, frame->sp,
+		frame->ss
+
+	);
 	hcf();
 }
 void iop_handler(InterruptFrame *frame) {
@@ -243,9 +256,7 @@ extern "C" void kmain(void) {
 		UUID_PRINTF_ARGS(
 			executable_file_request.response->executable_file->gpt_part_uuid));
 
-	printf("\"%09.4d\"\n", 60);
-
-	// test();
+	test();
 
 	//  convert this to a non busy-loop
 	for (;;) {
@@ -260,33 +271,6 @@ extern "C" void kmain(void) {
 		}
 	}
 }
-
-typedef struct MBRPartitionEntry_s {
-	uint8_t boot_indicator;
-	uint8_t start_cylinder;
-	uint8_t start_head;
-	uint8_t start_sector;
-	uint8_t os_type;
-	uint8_t end_cylinder;
-	uint8_t end_head;
-	uint8_t end_sector;
-	uint32_t starting_LBA;
-	uint32_t size_in_LBA;
-} __attribute__((packed)) MBRPartitionEntry;
-
-typedef struct MBR_s {
-	uint8_t bootstrap_code_1[218];
-	uint8_t zero[2];
-	uint8_t orig_phys_drive;
-	uint8_t seconds;
-	uint8_t minutes;
-	uint8_t hours;
-	uint8_t bootstrap_code_2[216];
-	uint32_t disk_sig;
-	uint16_t copy_protected;
-	MBRPartitionEntry partitions[4];
-	uint8_t boot_signature[2];
-} __attribute__((packed)) MBR;
 
 typedef struct FAT_BPB_s {
 	uint8_t jmp_boot[3];
@@ -326,11 +310,28 @@ typedef struct FAT_BPB_s {
 			uint32_t volume_id;
 			char volume_label[11];
 			char filesystem_type[8];
-
 		} __attribute__((packed)) FAT_32;
 	};
 } __attribute__((packed)) FAT_BPB;
 
+#if 1
+
+void test() {
+	// typeid 0FC63DAF-8483-4772-8E79-3D69D8477DE4
+	UUID linux_fs_type = {0x0FC63DAF,
+	                      0x8483,
+	                      0x4772,
+	                      {0x8E, 0x79, 0x3D, 0x69, 0xD8, 0x47, 0x7D, 0xE4}};
+
+	KLIST_FOREACH(&partition_list, part_head) {
+		Partition *part = container_of(part_head, Partition, global);
+		if (memcmp(&linux_fs_type, &part->type, sizeof(UUID)) == 0) {
+			parse_ext(part);
+		}
+	}
+}
+
+#else
 void test() {
 
 	if (sizeof(FAT_BPB) != 90) {
@@ -339,22 +340,22 @@ void test() {
 	if (disk_list.next == &disk_list) {
 		printf("no disks registed");
 	}
-	Disk *disk = container_of(disk_list.next, Disk, global);
-	if (disk->file_ops.read == nullptr) {
+	uint8_t *boot_sector = (uint8_t *)kalloc(512);
+	KLIST_FOREACH(&disk_list, head) {
+		Disk *disk = container_of(head, Disk, global);
+		disk->disk_ops.read(disk, 0, boot_sector, 1);
+		MBR *mbr = (MBR *)boot_sector;
+	}
+	Disk *disk = container_of(disk_list.next->next, Disk, global);
+	if (disk->disk_ops.read == nullptr) {
 		printf("disk doesn't have read function");
 	}
 
-	uint8_t *boot_sector = (uint8_t *)kalloc(512);
-	disk->file_ops.read(disk, 0, boot_sector, 1);
+	disk->disk_ops.read(disk, 0, boot_sector, 1);
 
 	MBR mbr;
-	memcpy(&mbr, boot_sector, 512);
+	memcpy(&mbr, boot_sector, sizeof(MBR));
 
-	if (mbr.partitions[0].os_type == 0xEE) {
-		UNIMPLEMENTED_NAME("GPT disks");
-		printf("only MBR disk are supported");
-		return;
-	}
 	MBRPartitionEntry boot_partition_entry = {};
 	for (uint32_t i = 0; i < 4; i++) {
 		MBRPartitionEntry entry = mbr.partitions[i];
@@ -372,10 +373,15 @@ void test() {
 		       entry.end_head, entry.end_sector, entry.starting_LBA,
 		       entry.size_in_LBA);
 	}
+	if (mbr.partitions[0].os_type == 0xEE) {
+		UNIMPLEMENTED_NAME("GPT disks");
+		printf("only MBR disk are supported");
+		return;
+	}
 	printf("----------------------------------------------------\n");
 	uint64_t fat_part_start_sector = boot_partition_entry.starting_LBA;
 	memset(boot_sector, 0, 512);
-	disk->file_ops.read(disk, fat_part_start_sector, boot_sector, 1);
+	disk->disk_ops.read(disk, fat_part_start_sector, boot_sector, 1);
 	printf("bpb data: \n");
 	for (uint64_t i = 0; i < 512; i += 8) {
 		printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
@@ -423,7 +429,7 @@ void test() {
 	uint64_t fat_start_sector =
 		fat_part_start_sector + fat_bpb.reserved_sector_count;
 
-	disk->file_ops.read(disk, fat_start_sector, boot_sector, 1);
+	disk->disk_ops.read(disk, fat_start_sector, boot_sector, 1);
 	printf("fat data(part_start + %hu): \n", fat_bpb.reserved_sector_count);
 	for (uint64_t i = 0; i < 512; i += 8) {
 		printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
@@ -438,7 +444,7 @@ void test() {
 	                       (fat_bpb.number_of_FATs * fat_size),
 	              i = 0;
 	     i < root_directory_sectors; i++, sector++) {
-		disk->file_ops.read(disk, sector, boot_sector, 1);
+		disk->disk_ops.read(disk, sector, boot_sector, 1);
 
 		printf("root dir(%lu sec): \n", sector - fat_part_start_sector);
 		for (uint64_t i = 0; i < 512; i += 8) {
@@ -449,5 +455,5 @@ void test() {
 		}
 		printf("\n");
 	}
-	printf("os_type 0x%x", boot_partition_entry.os_type);
 }
+#endif
