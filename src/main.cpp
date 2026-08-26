@@ -12,6 +12,7 @@
 #include "driver/pic.hpp"
 #include "driver/uart.hpp"
 #include "driver/virtio_blk.hpp"
+#include "fs/common.hpp"
 #include "limine/limine_requests.hpp"
 #include "list/container_of.hpp"
 #include "list/klist.hpp"
@@ -116,6 +117,19 @@ void unknown_handler(InterruptFrame *frame) {
 	} else {
 		printf("unknow exception\nnumber: %lx\n", frame->interupt_nr);
 	}
+	printf(
+		"InterruptFrame: "
+		"r15=%#zx\nr14=%#zx\nr13=%#zx\nr12=%#zx\nr11=%#zx\nr10=%#zx\nr9=%#"
+		"zx\nr8=%#zx\n"
+		"rbp=%#zx\nrdi=%#zx\nrsi=%#zx\nrdx=%#zx\nrcx=%#zx\nrbx=%#zx\nrax=%#zx\n"
+		"interrupt_nr=%#zx\nsp=%#zx\n"
+		"ss=%#zx\nRIP=%#zx\nCS=%#zx\nRFLAGS=%#zx\nerror=%lb\n",
+		frame->r15, frame->r14, frame->r13, frame->r12, frame->r11, frame->r10,
+		frame->r9, frame->r8, frame->rbp, frame->rdi, frame->rsi, frame->rdx,
+		frame->rcx, frame->rbx, frame->rax, frame->interupt_nr, frame->sp,
+		frame->ss, frame->rip, frame->cs, frame->flags, frame->error_code
+
+	);
 	hcf();
 }
 
@@ -180,6 +194,7 @@ void test();
 /// end temp
 
 extern "C" void kmain(void) {
+
 	if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
 		hcf();
 	}
@@ -258,6 +273,8 @@ extern "C" void kmain(void) {
 
 	test();
 
+	// ext part .open("/tttt/file.txt");
+
 	//  convert this to a non busy-loop
 	for (;;) {
 		// void *mem = page_alloc(255);
@@ -316,6 +333,79 @@ typedef struct FAT_BPB_s {
 
 #if 1
 
+typedef struct MountPoint_s {
+	Partition *target_partition;
+	DirectoryEntry root;
+} MountPoint;
+
+DirectoryEntry root_entry = {
+	.owner = NULL,
+	.fs_file_id = 2,
+	.type = 2,
+};
+
+void vfs_get_entry(Partition *partition, const char *file_path,
+                   DirectoryEntry *entry) {
+	if (*file_path == '/') {
+		file_path++;
+	}
+	char *current_search_name = (char *)kalloc(256);
+	uint8_t name_length;
+	DirectoryEntry current_dir_entry = root_entry;
+	while (*file_path != 0) {
+		name_length = 0;
+		DirectoryEntry temp_dir_entry;
+
+		while (*file_path != '/' && *file_path != 0) {
+			current_search_name[name_length++] = *(file_path++);
+		}
+		current_search_name[name_length] = 0;
+		if (*file_path == '/') {
+			file_path++;
+		}
+		printf("search name: %s\n", current_search_name);
+
+		// TODO: get DirectoryEntry from current partition
+
+		partition->fs->part_ops->get_dir_entry(
+			partition, current_search_name, current_dir_entry, &temp_dir_entry);
+		current_dir_entry = temp_dir_entry;
+		if (current_dir_entry.owner == NULL) {
+			entry->owner = NULL;
+			kfree(current_search_name);
+			return;
+		}
+		printf("fs file id: %u\n", current_dir_entry.fs_file_id);
+
+		// TODO: get MountPoint from DirectoryEntry if it exists
+		//		 then get the partition from the mount point
+	}
+	*entry = current_dir_entry;
+}
+
+Partition *root_part = NULL;
+
+File *vfs_open(const char *file_path) {
+	File *file = (File *)kalloc(sizeof(File));
+	file->owner = root_part;
+	DirectoryEntry entry;
+	vfs_get_entry(root_part, file_path, &entry);
+
+	if (entry.owner == NULL) {
+		file->owner = NULL;
+	}
+
+	file->owner = entry.owner;
+	file->fs_file_id = entry.fs_file_id;
+	file->cursor = 0;
+	// root_part->fs->file_ops->open(file_path, file);
+	return file;
+}
+
+int vfs_read(File *file, void *buffer, uint64_t bytes) {
+	return file->owner->fs->file_ops->read(file, buffer, bytes);
+}
+
 void test() {
 	// typeid 0FC63DAF-8483-4772-8E79-3D69D8477DE4
 	UUID linux_fs_type = {0x0FC63DAF,
@@ -326,8 +416,25 @@ void test() {
 	KLIST_FOREACH(&partition_list, part_head) {
 		Partition *part = container_of(part_head, Partition, global);
 		if (memcmp(&linux_fs_type, &part->type, sizeof(UUID)) == 0) {
+			part->fs = &ext2_file_system_type;
 			parse_ext(part);
+			root_part = part;
 		}
+	}
+
+	File *file = vfs_open("/tttt/superlongfilenamehere.txt"); // /tttt/file.txt
+	uint8_t *buffer = (uint8_t *)kalloc(256);
+	uint64_t bytes_read = vfs_read(file, buffer, 256);
+
+	while (bytes_read == 256) {
+		for (uint64_t i = 0; i < 256; i++) {
+			printf("%c", buffer[i]);
+		}
+
+		bytes_read = vfs_read(file, buffer, 256);
+	}
+	for (uint64_t i = 0; i < bytes_read; i++) {
+		printf("%c", buffer[i]);
 	}
 }
 

@@ -4,4 +4,6 @@
 
 void parse_ext(Partition *partition);
 
+extern FileSystemType ext2_file_system_type;
+
 #endif // INCLUDE_FS_EXT_HPP_

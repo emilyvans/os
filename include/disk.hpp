@@ -1,6 +1,6 @@
 #ifndef INCLUDE_DISK_HPP_
 #define INCLUDE_DISK_HPP_
-#include "driver/virtio_blk.hpp"
+#include "fs/common.hpp"
 #include "list/klist.hpp"
 #include <stdint.h>
 
@@ -11,10 +11,14 @@
 		uuid.d[4], uuid.d[5], uuid.d[6], uuid.d[7]
 
 typedef struct DiskOperations_s {
-	void (*write)(struct Disk_s *disk, uint64_t start_sector, void *buffer,
-	              uint64_t sector_count);
-	void (*read)(struct Disk_s *disk, uint64_t start_sector, void *buffer,
-	             uint64_t sector_count);
+	void (*write_sectors)(struct Disk_s *disk, uint64_t start_sector,
+	                      void *buffer, uint64_t sector_count);
+	void (*read_sectors)(struct Disk_s *disk, uint64_t start_sector,
+	                     void *buffer, uint64_t sector_count);
+	void (*write)(struct Disk_s *disk, uint64_t start, void *buffer,
+	              uint64_t bytes);
+	void (*read)(struct Disk_s *disk, uint64_t start, void *buffer,
+	             uint64_t bytes);
 } DiskOperations;
 
 typedef struct UUID_s {
@@ -40,6 +44,7 @@ typedef struct Partition_s {
 	KListHead siblings;
 	KListHead fs_partitions;
 	struct FileSystemType_s *fs;
+	void *private_data;
 	uint8_t number;
 	Disk *disk;
 	UUID id;
@@ -51,6 +56,8 @@ typedef struct Partition_s {
 typedef struct FileSystemType_s {
 	KListHead global;
 	KListHead partitions;
+	FileOperations *file_ops;
+	PartitionOperations *part_ops;
 } FileSystemType;
 
 typedef struct MBRPartitionEntry_s {

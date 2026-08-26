@@ -19,7 +19,7 @@ void register_disk(Disk *disk) {
 
 	MBR *mbr = (MBR *)kalloc(disk->sector_size);
 
-	disk->disk_ops.read(disk, 0, (uint8_t *)mbr, 1);
+	disk->disk_ops.read_sectors(disk, 0, (uint8_t *)mbr, 1);
 
 	bool is_gpt = false;
 	for (uint8_t i = 0; i < 4; i++) {
@@ -102,7 +102,7 @@ int handle_gpt_disk(MBR *protective_mbr, Disk *disk) {
 	printf("gptdisk\n");
 	uint8_t *buffer = (uint8_t *)kalloc(disk->sector_size);
 
-	disk->disk_ops.read(disk, 1, buffer, 1);
+	disk->disk_ops.read_sectors(disk, 1, buffer, 1);
 	GPT_header header;
 	memcpy(&header, buffer, sizeof(GPT_header));
 	kfree(buffer);
@@ -122,8 +122,8 @@ int handle_gpt_disk(MBR *protective_mbr, Disk *disk) {
 
 	buffer = (uint8_t *)page_alloc(page_count);
 
-	disk->disk_ops.read(disk, header.partition_entry_lba, buffer,
-	                    partition_table_sector_count);
+	disk->disk_ops.read_sectors(disk, header.partition_entry_lba, buffer,
+	                            partition_table_sector_count);
 
 	KListHead *siblings = nullptr;
 

@@ -4,6 +4,7 @@
 #include "list/container_of.hpp"
 #include "list/klist.hpp"
 #include "memory/physical_memory.hpp"
+#include "panic.hpp"
 #include "utils.hpp"
 #include <limine.h>
 #include <stdint.h>
@@ -42,6 +43,8 @@ void *page_alloc(uint64_t pages, uint64_t alignment) {
 	if (addr == NULL) {
 		return NULL;
 	}
+	//	printf("page alloced: %p, count: %lu\n",
+	//	       (void *)(addr + hhdm_request.response->offset), pages);
 	return (void *)(addr + hhdm_request.response->offset);
 }
 
@@ -85,6 +88,11 @@ uint64_t slab_availible_space = ((SLAB_PAGES * 4096) - sizeof(Slab));
 
 Slab *alloc_slab(uint64_t obj_size) {
 	void *pages = page_alloc(SLAB_PAGES, SLAB_PAGES);
+
+	if (pages == NULL) {
+		printf("can't allocate slab: out of memory");
+		hcf();
+	}
 
 	Page *first_page = get_page_from_address(pages);
 
@@ -169,17 +177,21 @@ void *kalloc(uint64_t bytes) {
 		slab->free_count -= 1;
 		if (slab->free_count == 0) {
 			KListHead *list_head =
-				klist_pop_head(&selected_cache->partial_slabs);
+				klist_pop_head(selected_cache->partial_slabs.next);
 			klist_add_tail(&selected_cache->full_slabs, list_head);
 		}
+		//		printf("slab alloced: %p, objec size: %lu, slab: %p\n",
+		// free_list, 		       slab->object_size, slab);
 		return free_list;
 	} else if (!klist_is_empty(&selected_cache->free_slabs)) {
 		Slab *slab = container_of(selected_cache->free_slabs.next, Slab, list);
 		FreeList *free_list = slab->free_list;
 		slab->free_list = free_list->next;
 		slab->free_count -= 1;
-		KListHead *list_head = klist_pop_head(&selected_cache->free_slabs);
+		KListHead *list_head = klist_pop_head(selected_cache->free_slabs.next);
 		klist_add_tail(&selected_cache->partial_slabs, list_head);
+		//		printf("slab alloced: %p, objec size: %lu, slab: %p\n",
+		// free_list, 		       slab->object_size, slab);
 		return free_list;
 	} else {
 		Slab *slab = alloc_slab(selected_cache->object_size);
@@ -188,6 +200,8 @@ void *kalloc(uint64_t bytes) {
 		slab->free_list = free_list->next;
 		slab->free_count -= 1;
 		klist_add_tail(&selected_cache->partial_slabs, &slab->list);
+		//		printf("slab alloced: %p, objec size: %lu, slab: %p\n",
+		// free_list, 		       slab->object_size, slab);
 		return free_list;
 	}
 
@@ -201,9 +215,14 @@ void kfree(void *ptr) {
 		while (current_page->data < (current_page - 1)->data) {
 			current_page = current_page - 1;
 		}
-		free_pages((void *)current_page->address, current_page->data - 1);
+		void *base = (void *)(current_page->address << 12);
+		//		printf("page kfree: %p(%p), count: %u\n", ptr, base,
+		//		       current_page->data);
+		free_pages(base, current_page->data - 1);
 	} else if (page->type == PageTypeSlab) {
 		Slab *slab = (Slab *)((uintptr_t)ptr & ~((4096 * SLAB_PAGES) - 1));
+		//		printf("slab kfree: %p, object size: %lu, slab: %p\n", ptr,
+		//		       slab->object_size, slab);
 		FreeList *base_address =
 			(FreeList *)(((uint64_t)ptr / slab->object_size) *
 		                 slab->object_size);

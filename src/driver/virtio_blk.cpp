@@ -312,8 +312,8 @@ void virtio_blk_write(Disk *disk, uint64_t start_sector, void *buffer,
 }
 
 DiskOperations virtio_blk_dops = {
-	.read = &virtio_blk_read,
-	.write = &virtio_blk_write,
+	.read_sectors = &virtio_blk_read,
+	.write_sectors = &virtio_blk_write,
 };
 
 int virtio_blk_probe(PCIDevice *device) {
