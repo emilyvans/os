@@ -9,7 +9,9 @@ qemu-system-x86_64 \
 	-monitor telnet:127.0.0.1:7777,server,nowait \
 	-serial mon:stdio \
 	-drive format=raw,file=drive.hdd,if=none,id=disk0 \
-	-device virtio-blk-pci,drive=disk0 \
+	-drive format=raw,file=ext2.hdd,if=none,id=disk1 \
+	-device virtio-blk-pci,drive=disk1,bootindex=2 \
+	-device virtio-blk-pci,drive=disk0,bootindex=1 \
 	-device virtio-sound \
 	-device VGA \
 	-device virtio-gpu-pci \
