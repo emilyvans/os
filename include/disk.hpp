@@ -15,10 +15,10 @@ typedef struct DiskOperations_s {
 	                      void *buffer, uint64_t sector_count);
 	void (*read_sectors)(struct Disk_s *disk, uint64_t start_sector,
 	                     void *buffer, uint64_t sector_count);
-	void (*write)(struct Disk_s *disk, uint64_t start, void *buffer,
-	              uint64_t bytes);
-	void (*read)(struct Disk_s *disk, uint64_t start, void *buffer,
-	             uint64_t bytes);
+	// void (*write)(struct Disk_s *disk, uint64_t start, void *buffer,
+	//              uint64_t bytes);
+	// void (*read)(struct Disk_s *disk, uint64_t start, void *buffer,
+	//              uint64_t bytes);
 } DiskOperations;
 
 typedef struct UUID_s {

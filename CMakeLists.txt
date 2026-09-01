@@ -36,6 +36,7 @@ set(SOURCES
 	./src/driver/virtio_blk.cpp
 	./src/driver/disk.cpp
 	./src/driver/fs/ext.cpp
+	./src/driver/fs/vfat.cpp
 )
 
 add_executable(myos ${SOURCES})
@@ -55,16 +56,16 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 	COMMAND make -C ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine
 	COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine bios-install
 		${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd 1
-	COMMAND mformat -v OS -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
-	COMMAND mmd -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine ::/longname ::/realylongname ::/extremelylongname
-	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
+	COMMAND mformat -v OS -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@3M
+	COMMAND mmd -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@3M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine ::/longname ::/realylongname ::/extremelylongname
+	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@3M
 		${CMAKE_CURRENT_SOURCE_DIR}/limine.conf
 		${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/limine-bios.sys
 		::/boot/limine
-	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
+	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@3M
 		${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/BOOTIA32.EFI
 		::/EFI/BOOT
-	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@1M
+	COMMAND mcopy -i ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd@@3M
 		${CMAKE_CURRENT_SOURCE_DIR}/external/Limine/BOOTX64.EFI
 		::/EFI/BOOT
 	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/limine.conf
@@ -79,7 +80,7 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/drive.hdd
 	COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd ${CMAKE_CURRENT_BINARY_DIR}/drive.hdd
-	COMMAND mcopy -o -i drive.hdd@@1M ${CMAKE_CURRENT_BINARY_DIR}/myos ::/boot
+	COMMAND mcopy -o -i drive.hdd@@3M ${CMAKE_CURRENT_BINARY_DIR}/myos ::/boot
 	COMMAND cp drive.hdd drive.img
 	DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/limine_drive.hdd
 			myos

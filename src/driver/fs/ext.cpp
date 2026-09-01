@@ -331,63 +331,63 @@ void parse_ext(Partition *partition) {
 	uint8_t *buffer = (uint8_t *)kzalloc(byte_size);
 
 	disk->disk_ops.read_sectors(disk, start + ldas, buffer, ldas);
-
-	printf("data (%lu Bytes):\n", byte_size);
-	for (uint64_t i = 0; i < byte_size; i += 8) {
-		printf("%02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx\n",
-		       buffer[i], buffer[i + 1], buffer[i + 2], buffer[i + 3],
-		       buffer[i + 4], buffer[i + 5], buffer[i + 6], buffer[i + 7]);
-	}
+	/*
+	    printf("data (%lu Bytes):\n", byte_size);
+	    for (uint64_t i = 0; i < byte_size; i += 8) {
+	        printf("%02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx\n",
+	               buffer[i], buffer[i + 1], buffer[i + 2], buffer[i + 3],
+	               buffer[i + 4], buffer[i + 5], buffer[i + 6], buffer[i + 7]);
+	    }*/
 	EXT2SuperBlock super_block;
 	memcpy(&super_block, buffer, sizeof(super_block));
 	kfree(buffer);
-	printf(
-		"superblock:\n total_inodes=%u\n total_blocks=%u\n "
-		"reserved_blocks=%u\n "
-		"unalloced_blocks=%u\n unalloced_inodes=%u\n my_lba=%u\n "
-		"block_size=%u\n fragment_size=%u\n "
-		"num_blocks_in_block_group=%u\n num_fragments_in_block_group=%u\n "
-		"num_inodes_in_block_group=%u\n last_mount_time=%u\n "
-		"last_written_time=%u\n "
-		"num_mounted_since_checked=%hu\n num_mounted_before_check=%hu\n "
-		"signature=%#hx\n file_system_state=%hu\n error_handling=%hu\n "
-		"minor_version=%hu\n "
-		"posix_time_last_check=%u\n posix_time_interval_forced_check=%u\n "
-		"os_id=%u\n major_version=%u\n reserved_user_id=%hu\n "
-		"reserved_group_id=%hu\n "
-		"first_non_reseved_inode=%u\n inode_structure_size=%hu\n "
-		"my_block_group=%b\n optional_features=%#b\n required_features=%#b\n "
-		"read_only_features=%#b\n "
-		"file_system_id=" UUID_FORMAT_STRING
-		"\n volume_name=\"%.16s\"\n last_mounted_path=\"%.64s\"\n "
-		"compression_algorithm=%u\n "
-		"blocks_to_preallocate_files=%u\n blocks_to_preallocate_dirs=%u\n "
-		"journal_id=" UUID_FORMAT_STRING
-		"\n journal_inode=%u\n journal_device=%u\n "
-		"head_orphan_inode=%u\n",
-		super_block.total_inodes, super_block.total_blocks,
-		super_block.reserved_blocks, super_block.unalloced_blocks,
-		super_block.unalloced_inodes, super_block.my_lba,
-		1024 << super_block.block_size, 1024 << super_block.fragment_size,
-		super_block.num_blocks_in_block_group,
-		super_block.num_fragments_in_block_group,
-		super_block.num_inodes_in_block_group, super_block.last_mount_time,
-		super_block.last_written_time, super_block.num_mounted_since_checked,
-		super_block.num_mounted_before_check, super_block.signature,
-		super_block.file_system_state, super_block.error_handling,
-		super_block.minor_version, super_block.posix_time_last_check,
-		super_block.posix_time_interval_forced_check, super_block.os_id,
-		super_block.major_version, super_block.reserved_user_id,
-		super_block.reserved_group_id, super_block.first_non_reseved_inode,
-		super_block.inode_structure_size, super_block.my_block_group,
-		super_block.optional_features, super_block.required_features,
-		super_block.read_only_features,
-		UUID_PRINTF_ARGS(super_block.file_system_id), super_block.volume_name,
-		super_block.last_mounted_path, super_block.compression_algorithm,
-		(unsigned)super_block.blocks_to_preallocate_files,
-		(unsigned)super_block.blocks_to_preallocate_dirs,
-		UUID_PRINTF_ARGS(super_block.journal_id), super_block.journal_inode,
-		super_block.journal_device, super_block.head_orphan_inode);
+	/*printf(
+	    "superblock:\n total_inodes=%u\n total_blocks=%u\n "
+	    "reserved_blocks=%u\n "
+	    "unalloced_blocks=%u\n unalloced_inodes=%u\n my_lba=%u\n "
+	    "block_size=%u\n fragment_size=%u\n "
+	    "num_blocks_in_block_group=%u\n num_fragments_in_block_group=%u\n "
+	    "num_inodes_in_block_group=%u\n last_mount_time=%u\n "
+	    "last_written_time=%u\n "
+	    "num_mounted_since_checked=%hu\n num_mounted_before_check=%hu\n "
+	    "signature=%#hx\n file_system_state=%hu\n error_handling=%hu\n "
+	    "minor_version=%hu\n "
+	    "posix_time_last_check=%u\n posix_time_interval_forced_check=%u\n "
+	    "os_id=%u\n major_version=%u\n reserved_user_id=%hu\n "
+	    "reserved_group_id=%hu\n "
+	    "first_non_reseved_inode=%u\n inode_structure_size=%hu\n "
+	    "my_block_group=%b\n optional_features=%#b\n required_features=%#b\n "
+	    "read_only_features=%#b\n "
+	    "file_system_id=" UUID_FORMAT_STRING
+	    "\n volume_name=\"%.16s\"\n last_mounted_path=\"%.64s\"\n "
+	    "compression_algorithm=%u\n "
+	    "blocks_to_preallocate_files=%u\n blocks_to_preallocate_dirs=%u\n "
+	    "journal_id=" UUID_FORMAT_STRING
+	    "\n journal_inode=%u\n journal_device=%u\n "
+	    "head_orphan_inode=%u\n",
+	    super_block.total_inodes, super_block.total_blocks,
+	    super_block.reserved_blocks, super_block.unalloced_blocks,
+	    super_block.unalloced_inodes, super_block.my_lba,
+	    1024 << super_block.block_size, 1024 << super_block.fragment_size,
+	    super_block.num_blocks_in_block_group,
+	    super_block.num_fragments_in_block_group,
+	    super_block.num_inodes_in_block_group, super_block.last_mount_time,
+	    super_block.last_written_time, super_block.num_mounted_since_checked,
+	    super_block.num_mounted_before_check, super_block.signature,
+	    super_block.file_system_state, super_block.error_handling,
+	    super_block.minor_version, super_block.posix_time_last_check,
+	    super_block.posix_time_interval_forced_check, super_block.os_id,
+	    super_block.major_version, super_block.reserved_user_id,
+	    super_block.reserved_group_id, super_block.first_non_reseved_inode,
+	    super_block.inode_structure_size, super_block.my_block_group,
+	    super_block.optional_features, super_block.required_features,
+	    super_block.read_only_features,
+	    UUID_PRINTF_ARGS(super_block.file_system_id), super_block.volume_name,
+	    super_block.last_mounted_path, super_block.compression_algorithm,
+	    (unsigned)super_block.blocks_to_preallocate_files,
+	    (unsigned)super_block.blocks_to_preallocate_dirs,
+	    UUID_PRINTF_ARGS(super_block.journal_id), super_block.journal_inode,
+	    super_block.journal_device, super_block.head_orphan_inode);*/
 
 	uint32_t block_groups = DIV_ROUNDUP(super_block.total_blocks,
 	                                    super_block.num_blocks_in_block_group);
@@ -395,9 +395,9 @@ void parse_ext(Partition *partition) {
 	private_data->block_size = block_size;
 	private_data->block_group_count = block_groups;
 
-	printf("block group count: %u(%u rem %u)\n", block_groups,
+	/*printf("block group count: %u(%u rem %u)\n", block_groups,
 	       super_block.total_blocks / super_block.num_blocks_in_block_group,
-	       super_block.total_blocks % super_block.num_blocks_in_block_group);
+	       super_block.total_blocks % super_block.num_blocks_in_block_group);*/
 	uint32_t bgdt_block_size = DIV_ROUNDUP(
 		block_groups * sizeof(EXT2BlockGroupDescriptor), block_size);
 	buffer = (uint8_t *)kzalloc(bgdt_block_size * block_size);
@@ -424,47 +424,47 @@ void parse_ext(Partition *partition) {
 	private_data->inodes_per_block_group =
 		super_block.num_inodes_in_block_group;
 	private_data->inode_size = super_block.inode_structure_size;
-
-	for (int64_t i = 0; i < block_groups; i++) {
-		EXT2BlockGroupDescriptor *bgd = block_group_descriptors + i;
-		printf("block group %ld:\n block bitmap blockid: %u\n inode bitmap "
-		       "blockid: %u\n inode table blockid: %u\n free block count: %u\n "
-		       "free inode count: %u\n used directory count: %u\n",
-		       i, bgd->block_bitmap_blockid, bgd->inode_bitmap_blockid,
-		       bgd->inode_table_blockid, bgd->free_block_count,
-		       bgd->free_inode_count, bgd->used_directory_count);
-	}
+	/*
+	    for (int64_t i = 0; i < block_groups; i++) {
+	        EXT2BlockGroupDescriptor *bgd = block_group_descriptors + i;
+	        printf("block group %ld:\n block bitmap blockid: %u\n inode bitmap "
+	               "blockid: %u\n inode table blockid: %u\n free block count:
+	   %u\n " "free inode count: %u\n used directory count: %u\n", i,
+	   bgd->block_bitmap_blockid, bgd->inode_bitmap_blockid,
+	               bgd->inode_table_blockid, bgd->free_block_count,
+	               bgd->free_inode_count, bgd->used_directory_count);
+	    }*/
 
 	EXT2INode *root = ext2_read_inode(2, partition);
 
 	uint8_t *root_inode_buf = (uint8_t *)root;
+	/*
+	    for (uint64_t i = 0; i < super_block.inode_structure_size; i += 8) {
+	        printf(" %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx\n",
+	               root_inode_buf[i], root_inode_buf[i + 1], root_inode_buf[i +
+	   2], root_inode_buf[i + 3], root_inode_buf[i + 4], root_inode_buf[i + 5],
+	   root_inode_buf[i + 6], root_inode_buf[i + 7]);
+	    }
+	    printf("mode: %#08x\n", root->flags);
+	    printf("blocks: %u\n", root->blocks);
 
-	for (uint64_t i = 0; i < super_block.inode_structure_size; i += 8) {
-		printf(" %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx\n",
-		       root_inode_buf[i], root_inode_buf[i + 1], root_inode_buf[i + 2],
-		       root_inode_buf[i + 3], root_inode_buf[i + 4],
-		       root_inode_buf[i + 5], root_inode_buf[i + 6],
-		       root_inode_buf[i + 7]);
-	}
-	printf("mode: %#08x\n", root->flags);
-	printf("blocks: %u\n", root->blocks);
+	    for (int64_t i = 0; i < 15; i++) {
+	        printf(" %ld:%u ", i, *(root->direct_block_id + i));
+	    }
+	    printf("\n");
 
-	for (int64_t i = 0; i < 15; i++) {
-		printf(" %ld:%u ", i, *(root->direct_block_id + i));
-	}
-	printf("\n");
-
-	printf("block(%u):\n", root->direct_block_id[0]);
+	    printf("block(%u):\n", root->direct_block_id[0]);
+	*/
 	uint8_t *dir_buffer = (uint8_t *)kalloc(block_size);
 	ext2_read_blocks(partition, root->direct_block_id[0], dir_buffer, 1);
-
-	for (uint64_t i = 0; i < block_size; i += 8) {
-		printf(" %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx\n",
-		       dir_buffer[i], dir_buffer[i + 1], dir_buffer[i + 2],
-		       dir_buffer[i + 3], dir_buffer[i + 4], dir_buffer[i + 5],
-		       dir_buffer[i + 6], dir_buffer[i + 7]);
-	}
-	printf("dir: /\n");
+	/*
+	    for (uint64_t i = 0; i < block_size; i += 8) {
+	        printf(" %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx\n",
+	               dir_buffer[i], dir_buffer[i + 1], dir_buffer[i + 2],
+	               dir_buffer[i + 3], dir_buffer[i + 4], dir_buffer[i + 5],
+	               dir_buffer[i + 6], dir_buffer[i + 7]);
+	    }
+	    printf("dir: /\n");*/
 	char current_dir[2] = ".";
 	char prev_dir[3] = "..";
 
@@ -480,17 +480,17 @@ void parse_ext(Partition *partition) {
 		    memcmp(prev_dir, file_name, 3) == 0)
 			continue;
 
-		printf(" name: %s, inode: %u, record length: %hu, name length: %hhu, "
+		/*printf(" name: %s, inode: %u, record length: %hu, name length: %hhu, "
 		       "file type: "
 		       "%hhu\n",
 		       file_name, entry->inode, entry->record_length,
-		       entry->name_length, entry->file_type);
+		       entry->name_length, entry->file_type);*/
 		EXT2INode *sub = ext2_read_inode(entry->inode, partition);
-		printf(" ");
+		/*printf(" ");
 		for (int64_t i = 0; i < 15; i++) {
-			printf(" %ld:%u ", i, *(sub->direct_block_id + i));
+		    printf(" %ld:%u ", i, *(sub->direct_block_id + i));
 		}
-		printf("\n");
+		printf("\n");*/
 		if (entry->file_type == 2 && entry->inode != 2) {
 			for (int64_t i = 0; i < 12; i++) {
 				if (sub->direct_block_id[i] == 0)
@@ -511,7 +511,7 @@ void parse_ext(Partition *partition) {
 					    memcmp(prev_dir, file_name, 3) == 0)
 						continue;
 
-					printf("  name: %s, inode: %u, record length: %hu, "
+					/*printf("  name: %s, inode: %u, record length: %hu, "
 					       "name "
 					       "length: "
 					       "%hhu, "
@@ -520,41 +520,41 @@ void parse_ext(Partition *partition) {
 					       file_name, entry_1->inode, entry_1->record_length,
 					       entry_1->name_length, entry_1->file_type);
 					EXT2INode *sub_1 =
-						ext2_read_inode(entry_1->inode, partition);
+					    ext2_read_inode(entry_1->inode, partition);
 					if (entry_1->file_type != 7) {
-						printf("  ");
-						for (int64_t i = 0; i < 15; i++) {
-							printf(" %ld:%u ", i,
-							       *(sub_1->direct_block_id + i));
-						}
-						printf("\n");
+					    printf("  ");
+					    for (int64_t i = 0; i < 15; i++) {
+					        printf(" %ld:%u ", i,
+					               *(sub_1->direct_block_id + i));
+					    }
+					    printf("\n");
 					} else {
-						char target[61];
-						memcpy(target, sub_1->direct_block_id, 60);
-						printf("   target: %s\n", target);
-					}
+					    char target[61];
+					    memcpy(target, sub_1->direct_block_id, 60);
+					    printf("   target: %s\n", target);
+					}*/
 
 					kfree(file_name);
 				}
 				kfree(dir1_buffer);
 			}
-		} else if (entry->file_type == 1) {
-			uint8_t *buf = (uint8_t *)kzalloc(block_size);
-			for (uint8_t i = 0; i < 12; i++) {
-				if (sub->direct_block_id[i] == 0)
-					continue;
-				ext2_read_blocks(partition, sub->direct_block_id[i], buf, 1);
-				printf("file block %u data:\n ", i);
-				for (uint64_t i = 0; i < bgdt_block_size * block_size; i += 8) {
-					printf("%c%c%c%c%c%c%c"
-					       "%c",
-					       buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
-					       buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7]);
-				}
-				printf("\n");
-			}
-			kfree(buf);
-		}
+		} /*else if (entry->file_type == 1) {
+		    uint8_t *buf = (uint8_t *)kzalloc(block_size);
+		    for (uint8_t i = 0; i < 12; i++) {
+		        if (sub->direct_block_id[i] == 0)
+		            continue;
+		        ext2_read_blocks(partition, sub->direct_block_id[i], buf, 1);
+		        printf("file block %u data:\n ", i);
+		        for (uint64_t i = 0; i < bgdt_block_size * block_size; i += 8) {
+		            printf("%c%c%c%c%c%c%c"
+		                   "%c",
+		                   buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
+		                   buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7]);
+		        }
+		        printf("\n");
+		    }
+		    kfree(buf);
+		}*/
 		kfree(sub);
 
 		kfree(file_name);

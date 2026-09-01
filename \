@@ -6,7 +6,6 @@
 #include "driver/console.hpp"
 #include "driver/device.hpp"
 #include "driver/fs/ext.hpp"
-#include "driver/fs/vfat.hpp"
 #include "driver/init.hpp"
 #include "driver/keyboard/keyboard.hpp"
 #include "driver/pci.hpp"
@@ -108,25 +107,6 @@ void PCI_interrupt_handler(InterruptFrame *frame) {
 	printf("pci int\n");
 }
 
-void divide_by_zero_fault(InterruptFrame *frame) {
-	clear_console();
-	printf("divide by zero\n");
-	printf(
-		"InterruptFrame: \n"
-		"r15=%#zx\nr14=%#zx\nr13=%#zx\nr12=%#zx\nr11=%#zx\nr10=%#zx\nr9=%#"
-		"zx\nr8=%#zx\n"
-		"rbp=%#zx\nrdi=%#zx\nrsi=%#zx\nrdx=%#zx\nrcx=%#zx\nrbx=%#zx\nrax=%#zx\n"
-		"interrupt_nr=%#zx\nsp=%#zx\n"
-		"ss=%#zx\nRIP=%#zx\nCS=%#zx\nRFLAGS=%#zx\nerror=%lb\n",
-		frame->r15, frame->r14, frame->r13, frame->r12, frame->r11, frame->r10,
-		frame->r9, frame->r8, frame->rbp, frame->rdi, frame->rsi, frame->rdx,
-		frame->rcx, frame->rbx, frame->rax, frame->interupt_nr, frame->sp,
-		frame->ss, frame->rip, frame->cs, frame->flags, frame->error_code
-
-	);
-	hcf();
-}
-
 void unknown_handler(InterruptFrame *frame) {
 	clear_console();
 	if (frame->interupt_nr > 0x20 && frame->interupt_nr < 0x30) {
@@ -169,9 +149,6 @@ void interrupt_handler(InterruptFrame *frame) {
 	}
 
 	switch (frame->interupt_nr) {
-	case 0x0:
-		divide_by_zero_fault(frame);
-		break;
 	case 0x6:
 		iop_handler(frame);
 		break;
@@ -420,9 +397,6 @@ void test() {
 			part->fs = &ext2_file_system_type;
 			parse_ext(part);
 			root_part = part;
-		} else if (memcmp(&efi_fs_type, &part->type, sizeof(UUID)) == 0) {
-			part->fs = &vfat_file_system_type;
-			parse_vfat(part);
 		}
 	}
 
@@ -446,5 +420,128 @@ void test() {
 }
 
 #else
-void test() {}
+void test() {
+
+	if (sizeof(FAT_BPB) != 90) {
+		printf("error fat_size: %lu must be 90", sizeof(FAT_BPB));
+	}
+	if (disk_list.next == &disk_list) {
+		printf("no disks registed");
+	}
+	uint8_t *boot_sector = (uint8_t *)kalloc(512);
+	KLIST_FOREACH(&disk_list, head) {
+		Disk *disk = container_of(head, Disk, global);
+		disk->disk_ops.read(disk, 0, boot_sector, 1);
+		MBR *mbr = (MBR *)boot_sector;
+	}
+	Disk *disk = container_of(disk_list.next->next, Disk, global);
+	if (disk->disk_ops.read == nullptr) {
+		printf("disk doesn't have read function");
+	}
+
+	disk->disk_ops.read(disk, 0, boot_sector, 1);
+
+	MBR mbr;
+	memcpy(&mbr, boot_sector, sizeof(MBR));
+
+	MBRPartitionEntry boot_partition_entry = {};
+	for (uint32_t i = 0; i < 4; i++) {
+		MBRPartitionEntry entry = mbr.partitions[i];
+		if ((entry.boot_indicator & 0x80) &&
+		    boot_partition_entry.boot_indicator == 0) {
+			boot_partition_entry = mbr.partitions[i];
+		}
+		printf("----------------------------------------------------\n");
+		printf("boot indicator: %hhx\nstart_cylinder: %hhu\nstart_head: %hhu\n"
+		       "start_sector: %hhu\nos_type: %hhu\nend_cylinder: %hhu\n"
+		       "end_head: %hhu\nend_sector: %hhu\nstarting LBA: %u\n"
+		       "size in LBA: %u\n",
+		       entry.boot_indicator, entry.start_cylinder, entry.start_head,
+		       entry.start_sector, entry.os_type, entry.end_cylinder,
+		       entry.end_head, entry.end_sector, entry.starting_LBA,
+		       entry.size_in_LBA);
+	}
+	if (mbr.partitions[0].os_type == 0xEE) {
+		UNIMPLEMENTED_NAME("GPT disks");
+		printf("only MBR disk are supported");
+		return;
+	}
+	printf("----------------------------------------------------\n");
+	uint64_t fat_part_start_sector = boot_partition_entry.starting_LBA;
+	memset(boot_sector, 0, 512);
+	disk->disk_ops.read(disk, fat_part_start_sector, boot_sector, 1);
+	printf("bpb data: \n");
+	for (uint64_t i = 0; i < 512; i += 8) {
+		printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
+		       boot_sector[i + 0], boot_sector[i + 1], boot_sector[i + 2],
+		       boot_sector[i + 3], boot_sector[i + 4], boot_sector[i + 5],
+		       boot_sector[i + 6], boot_sector[i + 7]);
+	}
+	printf("\n");
+
+	FAT_BPB fat_bpb;
+	memcpy(&fat_bpb, boot_sector, sizeof(FAT_BPB));
+
+	uint64_t root_directory_sectors =
+		((fat_bpb.root_entry_count * 32) + (fat_bpb.bytes_per_sector - 1)) /
+		fat_bpb.bytes_per_sector;
+
+	uint32_t fat_size;
+	uint32_t total_sectors;
+	if (fat_bpb.FAT_size_16 != 0) {
+		fat_size = fat_bpb.FAT_size_16;
+	} else {
+		fat_size = fat_bpb.FAT_32.FAT_size_32;
+	}
+
+	if (fat_bpb.total_sector_count_16 != 0) {
+		total_sectors = fat_bpb.total_sector_count_16;
+	} else {
+		total_sectors = fat_bpb.total_sector_count_32;
+	}
+	uint64_t data_sector_count =
+		total_sectors -
+		(fat_bpb.reserved_sector_count + (fat_bpb.number_of_FATs * fat_size) +
+	     root_directory_sectors);
+
+	uint64_t cluster_count = data_sector_count / fat_bpb.sectors_per_cluster;
+
+	printf("cluster count: %lu\n", cluster_count);
+	if (cluster_count < 4085) {
+		printf("FAT12\n");
+	} else if (cluster_count < 65525) {
+		printf("FAT16\n");
+	} else {
+		printf("FAT32\n");
+	}
+	uint64_t fat_start_sector =
+		fat_part_start_sector + fat_bpb.reserved_sector_count;
+
+	disk->disk_ops.read(disk, fat_start_sector, boot_sector, 1);
+	printf("fat data(part_start + %hu): \n", fat_bpb.reserved_sector_count);
+	for (uint64_t i = 0; i < 512; i += 8) {
+		printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
+		       boot_sector[i + 0], boot_sector[i + 1], boot_sector[i + 2],
+		       boot_sector[i + 3], boot_sector[i + 4], boot_sector[i + 5],
+		       boot_sector[i + 6], boot_sector[i + 7]);
+	}
+	printf("\n");
+
+	for (uint64_t sector = fat_part_start_sector +
+	                       fat_bpb.reserved_sector_count +
+	                       (fat_bpb.number_of_FATs * fat_size),
+	              i = 0;
+	     i < root_directory_sectors; i++, sector++) {
+		disk->disk_ops.read(disk, sector, boot_sector, 1);
+
+		printf("root dir(%lu sec): \n", sector - fat_part_start_sector);
+		for (uint64_t i = 0; i < 512; i += 8) {
+			printf(" 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx 0x%hhx\n",
+			       boot_sector[i + 0], boot_sector[i + 1], boot_sector[i + 2],
+			       boot_sector[i + 3], boot_sector[i + 4], boot_sector[i + 5],
+			       boot_sector[i + 6], boot_sector[i + 7]);
+		}
+		printf("\n");
+	}
+}
 #endif
